@@ -33,6 +33,33 @@ jobs:
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test install and desktop startup
+        shell: pwsh
+        run: |
+          $target = Join-Path $env:RUNNER_TEMP 'EmberTableInstalled'
+          $setup = Start-Process 'installer-output\EmberTable-Setup.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
+          $exe = Join-Path $target 'EmberTable.exe'
+          if (!(Test-Path $exe)) { throw 'Installed executable missing' }
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'EmberTableSmokeProfile'
+          $app = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 15
+          if ($app.HasExited) { throw "Desktop app exited unexpectedly: $($app.ExitCode)" }
+          $connections = Get-NetTCPConnection -OwningProcess $app.Id -State Listen -ErrorAction SilentlyContinue
+          $local = $connections | Where-Object LocalAddress -eq '127.0.0.1' | Select-Object -First 1
+          if (!$local) { Stop-Process -Id $app.Id -Force; throw 'Desktop local server did not start' }
+          $origin = "http://127.0.0.1:$($local.LocalPort)"
+          $page = Invoke-WebRequest $origin -UseBasicParsing
+          if ($page.Content -notmatch 'Ember Table') { throw 'App page missing' }
+          $data = @{ campaigns = @(@{ name = 'Installer smoke test' }) } | ConvertTo-Json -Depth 5
+          Invoke-RestMethod "$origin/api/workspace" -Method Post -Headers @{Origin=$origin} -ContentType 'application/json' -Body $data
+          $loaded = Invoke-RestMethod "$origin/api/workspace"
+          if ($loaded.campaigns[0].name -ne 'Installer smoke test') { throw 'Save/load failed' }
+          Stop-Process -Id $app.Id -Force
+          if (!(Test-Path (Join-Path $env:LOCALAPPDATA 'EmberTable\workspace.json'))) { throw 'Local save missing' }
+          $uninstall = Start-Process (Join-Path $target 'unins000.exe') -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw 'Uninstall failed' }
+          if (!(Test-Path (Join-Path $env:LOCALAPPDATA 'EmberTable\workspace.json'))) { throw 'Uninstall deleted campaign data' }
       - name: Verify installer exists
         shell: pwsh
         run: |
