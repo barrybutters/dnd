@@ -8,15 +8,15 @@ try:
     dlg=Desktop(backend='win32').window(class_name='#32770',visible_only=True)
     dlg.wait('visible',timeout=25)
     print('Native dialog title:',dlg.window_text(),flush=True)
-    field=dlg.child_window(control_id=1148)
+    field=dlg.child_window(control_id=1148,class_name='Edit',visible_only=True,enabled_only=True,found_index=0)
     if field.exists(timeout=1):
         try:field.set_edit_text(path)
         except Exception:field.child_window(class_name='Edit').set_edit_text(path)
     else:
-        fields=dlg.descendants(class_name='Edit')
+        fields=dlg.descendants(class_name='Edit',visible_only=True,enabled_only=True)
         if not fields:raise RuntimeError('No filename edit control in native Open dialog')
         fields[-1].set_edit_text(path)
-    dlg.child_window(control_id=1).click()
+    dlg.child_window(control_id=1,class_name='Button',visible_only=True,enabled_only=True,found_index=0).click()
     print('Selected synthetic ZIP through native Windows dialog',flush=True)
 except Exception:
     print('Visible native windows:',[(w.class_name(),w.window_text()) for w in Desktop(backend='win32').windows() if w.is_visible()],flush=True)
