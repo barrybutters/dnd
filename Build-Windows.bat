@@ -16,7 +16,7 @@ if not exist "%EMBER_ISCC%" (
 )
 "%EMBER_ISCC%" installer.iss
 if errorlevel 1 goto fail
-echo Installer created: installer-output\EmberTable-Setup.exe
+echo Installer created: installer-output\EmberTable-Setup-0.2.0.exe
 pause
 exit /b 0
 :fail

@@ -9,8 +9,21 @@ def main():
     http = server.ThreadingHTTPServer(('127.0.0.1', 0),server.Handler)
     http.app_origin = f'http://127.0.0.1:{http.server_port}'
     threading.Thread(target=http.serve_forever,daemon=True).start()
+    class DesktopAPI:
+        def open_display(self):
+            webview.create_window('Ember Table · Player Display',http.app_origin+'/display.html',width=1200,height=850)
+            return True
     try:
-        webview.create_window('Ember Table',http.app_origin,width=1440,height=960,min_size=(900,650))
+        main_window=webview.create_window('Ember Table',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
+        def before_close():
+            try:
+                pending=main_window.evaluate_js("Boolean(window.__saving || window.__scratchPending)")
+                if pending:
+                    main_window.evaluate_js("if(typeof save==='function') save(); if(typeof toast==='function') toast('Saving your changes. Close again in a moment.');")
+                    return False
+            except Exception:
+                pass
+        main_window.events.closing += before_close
         webview.start(gui='edgechromium',private_mode=False,storage_path=str(server.DATA/'webview'))
     finally:
         http.shutdown()

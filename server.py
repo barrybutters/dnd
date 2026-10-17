@@ -1,60 +1,158 @@
-"""Ember Table: local-only server. Python 3.10+, no installation required."""
-import sys, json, io, re, os, webbrowser, threading
+"""Offline Ember Table storage, PDF extraction, portable packages and recovery."""
+import sys,json,io,re,os,threading,time,zipfile,uuid,shutil,mimetypes
 from pathlib import Path
-from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-BASE = Path(__file__).resolve().parent
-sys.path.insert(0, str(BASE / 'vendor'))
+from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
+from urllib.parse import urlparse,parse_qs
+BASE=Path(__file__).resolve().parent
+sys.path.insert(0,str(BASE/'vendor'))
 from pypdf import PdfReader
-DATA = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'EmberTable'
-DATA.mkdir(parents=True, exist_ok=True)
+DATA=Path(os.environ.get('EMBER_TABLE_DATA') or (Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'EmberTable'))
+DATA.mkdir(parents=True,exist_ok=True)
+ASSETS=DATA/'assets';ASSETS.mkdir(exist_ok=True)
+BACKUPS=DATA/'backups';BACKUPS.mkdir(exist_ok=True)
+LOCK=threading.RLock()
+ASSET_RE=re.compile(r'^[a-f0-9]{32}\.(png|jpg|jpeg|webp|gif|mp3|wav|ogg|m4a|pdf)$')
+
+def validate(data):
+    if not isinstance(data,dict) or not isinstance(data.get('campaigns'),list) or not data['campaigns'] or len(data['campaigns'])>200:raise ValueError('Invalid workspace')
+    for c in data['campaigns']:
+        if not isinstance(c,dict) or not isinstance(c.get('name'),str):raise ValueError('Invalid campaign')
+    return data
+
+def read_workspace():
+    path=DATA/'workspace.json'
+    if not path.exists():return None
+    try:return validate(json.loads(path.read_text(encoding='utf-8')))
+    except (ValueError,OSError):
+        for p in sorted(BACKUPS.glob('*.json'),reverse=True):
+            try:
+                data=validate(json.loads(p.read_text(encoding='utf-8')))
+                data['_recovery']='Recovered from automatic backup '+p.name
+                return data
+            except (ValueError,OSError):continue
+        raise ValueError('The saved workspace is damaged. Restore an exported backup. The damaged file has been preserved.')
+
+def write_workspace(data):
+    validate(data)
+    with LOCK:
+        current=DATA/'workspace.json'
+        if current.exists():
+            # Preserve even a damaged current file; rotate only valid autosaves.
+            try:validate(json.loads(current.read_text(encoding='utf-8')))
+            except (ValueError,OSError):shutil.copy2(current,DATA/('damaged-'+str(time.time_ns())+'.json'))
+            else:shutil.copy2(current,BACKUPS/(str(time.time_ns())+'.json'))
+        raw=json.dumps(data,ensure_ascii=False).encode('utf-8')
+        tmp=DATA/'workspace.tmp'
+        with tmp.open('wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+        os.replace(tmp,current)
+        for p in sorted(BACKUPS.glob('*.json'),reverse=True)[30:]:p.unlink()
 
 def parse_pdf(raw):
-    reader = PdfReader(io.BytesIO(raw))
-    if reader.is_encrypted:
-        raise ValueError('Password-protected PDFs are not supported. Export an unlocked character sheet.')
-    if len(reader.pages)>40:
-        raise ValueError('Use a character sheet with 40 pages or fewer.')
-    fields = {str(k).lower().replace(' ', '').replace('_',''): str(v.get('/V','')) for k,v in (reader.get_fields() or {}).items()}
-    text = '\n'.join(p.extract_text() or '' for p in reader.pages)
+    reader=PdfReader(io.BytesIO(raw))
+    if reader.is_encrypted:raise ValueError('Export an unlocked PDF; encrypted PDFs are not supported.')
+    if len(reader.pages)>40:raise ValueError('Character sheets must have 40 pages or fewer.')
+    fields={re.sub(r'[\s_]','',str(k)).lower():str(v.get('/V','')) for k,v in (reader.get_fields() or {}).items()}
+    text='\n'.join(p.extract_text() or '' for p in reader.pages)
     def field(*names):
         for n in names:
-            v=fields.get(n.lower().replace(' ', '').replace('_',''))
-            if v and v!='None': return v
+            v=fields.get(re.sub(r'[\s_]','',n).lower())
+            if v and v!='None':return v
         return ''
-    def num(v,default):
-        m=re.search(r'\d+',v)
-        return int(m.group()) if m else default
-    name=field('CharacterName','CharacterName2','character_name')
-    hp=field('HPMax','MaxHitPoints','HitPointMaximum')
-    ac=field('AC','ArmorClass')
+    def number(v,default):
+        m=re.search(r'-?\d+',v);return int(m.group()) if m else default
+    def textnum(labels,default):
+        for label in labels:
+            m=re.search(label+r'\s*[:\n]?\s*(\d+)',text,re.I)
+            if m:return int(m.group(1))
+        return default
+    if not text.strip() and not fields:raise ValueError('No readable text. Scanned PDFs need manual entry; OCR is not included.')
+    name=field('CharacterName','CharacterName2')
     cl=field('ClassLevel','ClassAndLevel','Class')
-    if not text.strip() and not fields:
-        raise ValueError('No readable text found. This may be a scanned PDF; OCR is not included. Enter your character manually.')
-    return {'name':name,'class':cl,'level':num(field('Level'),num(cl,1)), 'hp':num(field('HPCurrent','CurrentHitPoints'),num(hp,10)), 'maxHp':num(hp,10),'ac':num(ac,10),'details':'PDF import — review all values. Unrecognized values use defaults.\n\n'+ '\n'.join(f'{k}: {v}' for k,v in fields.items())+'\n\n'+text,'needsReview':True}
+    maximum=number(field('HPMax','MaxHitPoints','HitPointMaximum'),textnum(['Hit Point Maximum','Maximum Hit Points'],10))
+    out={'name':name,'class':cl,'level':number(field('Level'),number(cl,1)),'hp':number(field('HPCurrent','CurrentHitPoints'),maximum),'maxHp':maximum,'ac':number(field('AC','ArmorClass'),textnum(['Armor Class'],10)),'abilities':{},'skills':{},'details':'PDF import — review values; missing fields use defaults.\n\n'+'\n'.join(f'{k}: {v}' for k,v in fields.items())+'\n\n'+text,'needsReview':True}
+    for short,long in [('str','Strength'),('dex','Dexterity'),('con','Constitution'),('int','Intelligence'),('wis','Wisdom'),('cha','Charisma')]:out['abilities'][short]=number(field(short,long,long+'Score'),10)
+    for skill in ['Acrobatics','Animal Handling','Arcana','Athletics','Deception','History','Insight','Intimidation','Investigation','Medicine','Nature','Perception','Performance','Persuasion','Religion','Sleight of Hand','Stealth','Survival']:
+        v=field(skill,skill.replace(' ',''))
+        if v:out['skills'][skill]=number(v,0)
+    out['recognized']=sorted(k for k,v in fields.items() if v and v!='None')
+    return out
+
+def export_package():
+    with LOCK:
+        data=read_workspace()
+        if data is None:raise ValueError('No workspace to export yet.')
+        b=io.BytesIO()
+        with zipfile.ZipFile(b,'w',zipfile.ZIP_DEFLATED) as z:
+            z.writestr('workspace.json',json.dumps(data,ensure_ascii=False))
+            for p in ASSETS.iterdir():
+                if ASSET_RE.fullmatch(p.name):z.write(p,'assets/'+p.name)
+        return b.getvalue()
+
+def import_package(raw):
+    with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        infos=z.infolist()
+        if len(infos)>2000 or sum(i.file_size for i in infos)>250*1024*1024:raise ValueError('Package too large (250 MB expanded maximum).')
+        if 'workspace.json' not in z.namelist():raise ValueError('Missing workspace.json')
+        data=validate(json.loads(z.read('workspace.json')))
+        assets={}
+        for i in infos:
+            if i.filename=='workspace.json':continue
+            if not i.filename.startswith('assets/') or not ASSET_RE.fullmatch(i.filename[7:]):raise ValueError('Invalid package path')
+            assets[i.filename[7:]]=z.read(i)
+        with LOCK:
+            for name,content in assets.items():
+                p=ASSETS/name
+                if p.exists() and p.read_bytes()!=content:raise ValueError('Asset identifier conflict. Restore into a fresh data folder.')
+            for name,content in assets.items():(ASSETS/name).write_bytes(content)
+            write_workspace(data)
+    return data
 
 class Handler(SimpleHTTPRequestHandler):
-    def log_message(self, *args): pass
-    def __init__(self,*args,**kwargs): super().__init__(*args,directory=str(BASE/'app'),**kwargs)
+    def log_message(self,*args):pass
+    def __init__(self,*a,**kw):super().__init__(*a,directory=str(BASE/'app'),**kw)
+    def send_bytes(self,data,mime,filename=None):
+        self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(data)))
+        if filename:self.send_header('Content-Disposition','attachment; filename="'+filename+'"')
+        self.end_headers();self.wfile.write(data)
     def reply(self,obj,code=200):
-        data=json.dumps(obj).encode();self.send_response(code);self.send_header('Content-Type','application/json');self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+        raw=json.dumps(obj).encode();self.send_response(code);self.send_header('Content-Type','application/json');self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
     def do_GET(self):
-        if self.path=='/api/workspace':
-            try:self.reply(json.loads((DATA/'workspace.json').read_text()))
-            except FileNotFoundError:self.reply(None)
-        else:super().do_GET()
+        path=urlparse(self.path).path
+        try:
+            if path=='/api/workspace':self.reply(read_workspace())
+            elif path=='/api/backups':self.reply([{'id':p.name,'time':p.stat().st_mtime} for p in sorted(BACKUPS.glob('*.json'),reverse=True)])
+            elif path=='/api/export':self.send_bytes(export_package(),'application/zip','Ember-Table-Campaigns.zip')
+            elif path=='/api/display':
+                s=read_workspace() or {};c=next((c for c in s.get('campaigns',[]) if c.get('id')==s.get('selected')),{});m=next((m for m in c.get('maps',[]) if m.get('id')==c.get('activeMap')),None)
+                if m:
+                    # This display omits DM records and hidden tokens.
+                    m=dict(m);m['tokens']=[t for t in m.get('tokens',[]) if not t.get('hidden')];m.pop('notes',None)
+                self.reply({'name':c.get('name','Ember Table'),'map':m,'round':c.get('round',1)})
+            elif path.startswith('/assets/') and ASSET_RE.fullmatch(path[8:]):
+                p=ASSETS/path[8:]
+                if not p.exists():self.reply({'error':'Asset missing'},404)
+                else:self.send_bytes(p.read_bytes(),mimetypes.guess_type(p.name)[0] or 'application/octet-stream')
+            else:super().do_GET()
+        except Exception as e:self.reply({'error':str(e)},500)
     def do_POST(self):
-        # Require same-origin browser requests, including the expected local host.
-        if self.headers.get('Origin') != self.server.app_origin or self.headers.get('Host')!=self.server.app_origin.removeprefix('http://'):
+        if self.headers.get('Origin')!=self.server.app_origin or self.headers.get('Host')!=self.server.app_origin.removeprefix('http://'):
             self.reply({'error':'Only the local app can write data.'},403);return
         try:
             n=int(self.headers.get('Content-Length','0'))
-            if n<1 or n>25*1024*1024:raise ValueError('File must be under 25 MB.')
-            raw=self.rfile.read(n)
-            if self.path=='/api/pdf':self.reply(parse_pdf(raw))
-            elif self.path=='/api/workspace':
-                data=json.loads(raw)
-                if not isinstance(data.get('campaigns'),list):raise ValueError('Invalid workspace')
-                tmp=DATA/'workspace.tmp';tmp.write_text(json.dumps(data),encoding='utf-8');os.replace(tmp,DATA/'workspace.json');self.reply({'saved':True})
+            if n<1 or n>100*1024*1024:raise ValueError('Request must be under 100 MB.')
+            raw=self.rfile.read(n);path=urlparse(self.path).path
+            if path=='/api/pdf':self.reply(parse_pdf(raw))
+            elif path=='/api/workspace':write_workspace(json.loads(raw));self.reply({'saved':True})
+            elif path=='/api/import':self.reply(import_package(raw))
+            elif path=='/api/recover':
+                name=json.loads(raw).get('id','')
+                if not re.fullmatch(r'\d+\.json',name):raise ValueError('Invalid backup')
+                data=validate(json.loads((BACKUPS/name).read_text(encoding='utf-8')));write_workspace(data);self.reply(data)
+            elif path=='/api/assets':
+                ext=parse_qs(urlparse(self.path).query).get('ext',[''])[0].lower()
+                name=uuid.uuid4().hex+'.'+ext
+                if not ASSET_RE.fullmatch(name):raise ValueError('Unsupported file type')
+                if len(raw)>40*1024*1024:raise ValueError('Asset must be under 40 MB.')
+                (ASSETS/name).write_bytes(raw);self.reply({'url':'/assets/'+name,'size':len(raw)})
             else:self.reply({'error':'Not found'},404)
         except Exception as e:self.reply({'error':str(e)},400)
-

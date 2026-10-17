@@ -1,0 +1,53 @@
+import os,sys,tempfile,unittest,io,json,zipfile,threading,urllib.request,urllib.error
+from pathlib import Path
+sandbox=tempfile.TemporaryDirectory();os.environ['EMBER_TABLE_DATA']=sandbox.name
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import server
+from pypdf import PdfWriter
+from pypdf.generic import DictionaryObject,NameObject,TextStringObject,ArrayObject,NumberObject
+
+class Storage(unittest.TestCase):
+    def setUp(self):
+        self.state={'campaigns':[{'id':'test','name':'Test campaign','maps':[]}]}
+    def test_01_atomic_save_and_backup_recovery(self):
+        server.write_workspace(self.state)
+        next_state={'campaigns':[{'id':'test','name':'Second revision'}]}
+        server.write_workspace(next_state)
+        self.assertTrue(list(server.BACKUPS.glob('*.json')))
+        self.assertEqual(server.read_workspace(),next_state)
+        (server.DATA/'workspace.json').write_text('broken')
+        recovered=server.read_workspace()
+        self.assertIn('_recovery',recovered)
+        server.write_workspace(recovered)
+        self.assertTrue(list(server.DATA.glob('damaged-*.json')))
+    def test_02_portable_assets_and_zip_path_rejection(self):
+        name='a'*32+'.png';(server.ASSETS/name).write_bytes(b'local-image')
+        server.write_workspace(self.state)
+        package=server.export_package()
+        (server.ASSETS/name).unlink()
+        server.import_package(package)
+        self.assertEqual((server.ASSETS/name).read_bytes(),b'local-image')
+        bad=io.BytesIO()
+        with zipfile.ZipFile(bad,'w') as z:z.writestr('workspace.json',json.dumps(self.state));z.writestr('../escape.txt','x')
+        with self.assertRaises(ValueError):server.import_package(bad.getvalue())
+        self.assertFalse((server.DATA.parent/'escape.txt').exists())
+    def test_03_pdf_fields(self):
+        w=PdfWriter();p=w.add_blank_page(width=600,height=800);refs=[]
+        for name,value in [('CharacterName','Test Hero'),('HPMax','32'),('AC','17'),('STR','16')]:
+            f=DictionaryObject({NameObject('/FT'):NameObject('/Tx'),NameObject('/T'):TextStringObject(name),NameObject('/V'):TextStringObject(value),NameObject('/Rect'):ArrayObject([NumberObject(0)]*4),NameObject('/Subtype'):NameObject('/Widget')});refs.append(w._add_object(f))
+        p[NameObject('/Annots')]=ArrayObject(refs);w._root_object[NameObject('/AcroForm')]=DictionaryObject({NameObject('/Fields'):ArrayObject(refs)})
+        raw=io.BytesIO();w.write(raw);r=server.parse_pdf(raw.getvalue())
+        self.assertEqual((r['name'],r['maxHp'],r['ac'],r['abilities']['str']),('Test Hero',32,17,16))
+    def test_04_local_api(self):
+        http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler);http.app_origin=f'http://127.0.0.1:{http.server_port}'
+        threading.Thread(target=http.serve_forever,daemon=True).start()
+        try:
+            origin=http.app_origin
+            req=urllib.request.Request(origin+'/api/workspace',data=json.dumps(self.state).encode(),headers={'Origin':origin,'Content-Type':'application/json'})
+            self.assertTrue(json.load(urllib.request.urlopen(req))['saved'])
+            req=urllib.request.Request(origin+'/api/workspace',data=b'{}',headers={'Origin':'https://example.com'})
+            with self.assertRaises(urllib.error.HTTPError) as caught:urllib.request.urlopen(req)
+            self.assertEqual(caught.exception.code,403)
+        finally:http.shutdown();http.server_close()
+
+if __name__=='__main__':unittest.main()
