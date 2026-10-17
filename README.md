@@ -1,4 +1,4 @@
-# Ember Table 0.3
+# Ember Table 0.3.1
 
 An offline Windows campaign companion for dungeon masters and players.
 
@@ -29,4 +29,6 @@ The workflow runs storage/recovery/PDF/archive tests, calculation tests, browser
 Third-party PDF processing: pypdf (BSD-3-Clause); license in `vendor/pypdf-LICENSE.txt`.
 
 ## Rulebooks
-Import your own rulebook PDFs from either rules tab. The source PDFs and search indexes stay under the local EmberTable data folder. They are included in portable ZIP exports and are not sent to GitHub or external services. PDF imports support up to 80 MB and 2000 pages per book. Scanned books can be rendered, but text search requires a readable text layer. Books marked as removed disappear from the shelf; their copied PDF assets may remain until the data folder is manually cleaned. The two edition tabs are separate shelves, not automated rules engines. PDF.js is bundled offline during the build under its included Apache-2.0 license.
+Import your own rulebook PDFs from either rules tab. The source PDFs and search indexes stay under the local EmberTable data folder. They are included in portable ZIP exports and are not sent to GitHub or external services. PDF imports support up to 200 MB and 2000 pages per book. Scanned books can be rendered, but text search requires a readable text layer. Books marked as removed disappear from the shelf; their copied PDF assets may remain until the data folder is manually cleaned. The two edition tabs are separate shelves, not automated rules engines. PDF.js is bundled offline during the build under its included Apache-2.0 license.
+
+Private book packs may be imported from either rules shelf using Import book pack. This adds books without replacing campaign data. Book packs are limited to 600 MB compressed and 1 GB expanded. PDFs from local book packs are not part of the public source repository or generic installer.

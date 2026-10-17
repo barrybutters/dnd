@@ -53,6 +53,21 @@ class Storage(unittest.TestCase):
         (server.RULES/(book['id']+'.json')).unlink();server.import_package(package)
         self.assertTrue((server.RULES/(book['id']+'.json')).exists())
 
+    def test_06_private_book_pack_keeps_campaigns(self):
+        before={'campaigns':[{'id':'keep','name':'Keep my campaign'}]}
+        server.write_workspace(before)
+        bid='d'*32;asset='e'*32+'.pdf'
+        book={'id':bid,'title':'Monster reference test','edition':'2014','url':'/assets/'+asset,'pageCount':1,'searchablePages':1,'pages':['test content']}
+        raw=io.BytesIO()
+        with zipfile.ZipFile(raw,'w') as z:
+            z.writestr('ember-rulepack.json',json.dumps({'format':'ember-rulepack','version':1}))
+            z.writestr('assets/'+asset,b'%PDF-test')
+            z.writestr('rulebooks/'+bid+'.json',json.dumps(book))
+        self.assertEqual(server.import_rulepack(raw.getvalue())['imported'],1)
+        self.assertEqual(server.read_workspace(),before)
+        self.assertEqual(server.import_rulepack(raw.getvalue())['imported'],1)
+        self.assertEqual((server.ASSETS/asset).read_bytes(),b'%PDF-test')
+
     def test_04_local_api(self):
         http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler);http.app_origin=f'http://127.0.0.1:{http.server_port}'
         threading.Thread(target=http.serve_forever,daemon=True).start()

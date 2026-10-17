@@ -124,7 +124,7 @@ def book_summary(book):
 
 def import_rulebook(raw,title,edition):
     if edition not in ['2014','2024']:raise ValueError('Choose a rules edition.')
-    if len(raw)>80*1024*1024:raise ValueError('Rulebook PDFs must be under 80 MB.')
+    if len(raw)>200*1024*1024:raise ValueError('Rulebook PDFs must be under 200 MB.')
     reader=PdfReader(io.BytesIO(raw))
     if reader.is_encrypted:raise ValueError('Use an unlocked PDF.')
     if not 1<=len(reader.pages)<=2000:raise ValueError('Use a PDF with 1 to 2000 pages.')
@@ -138,6 +138,36 @@ def import_rulebook(raw,title,edition):
         (ASSETS/asset_name).write_bytes(raw)
         tmp=RULES/(bid+'.tmp');tmp.write_text(json.dumps(book,ensure_ascii=False),encoding='utf-8');os.replace(tmp,RULES/(bid+'.json'))
     return book_summary(book)
+
+
+def import_rulepack(raw):
+    with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        infos=z.infolist()
+        if len(infos)>1000 or sum(i.file_size for i in infos)>1024*1024*1024:raise ValueError('Book pack is too large (1 GB expanded maximum).')
+        manifest=json.loads(z.read('ember-rulepack.json'))
+        if manifest.get('format')!='ember-rulepack' or manifest.get('version')!=1:raise ValueError('Unsupported book pack')
+        assets={};books={}
+        for info in infos:
+            name=info.filename
+            if name=='ember-rulepack.json':continue
+            if name.startswith('assets/') and ASSET_RE.fullmatch(name[7:]) and name.endswith('.pdf'):assets[name[7:]]=z.read(info)
+            elif name.startswith('rulebooks/') and re.fullmatch(r'[a-f0-9]{32}\.json',name[10:]):
+                b=validate_book(json.loads(z.read(info)))
+                if b['id']+'.json'!=name[10:]:raise ValueError('Book ID does not match its index')
+                books[name[10:]]=b
+            else:raise ValueError('Invalid book pack path')
+        if not books:raise ValueError('This pack contains no books')
+        for b in books.values():
+            if not re.fullmatch(r'/assets/[a-f0-9]{32}\.pdf',b.get('url','')) or b['url'][8:] not in assets:raise ValueError('Missing book PDF')
+        with LOCK:
+            for name,content in assets.items():
+                p=ASSETS/name
+                if p.exists() and p.read_bytes()!=content:raise ValueError('Asset conflict; source file has changed')
+            for name,content in assets.items():
+                if not (ASSETS/name).exists():(ASSETS/name).write_bytes(content)
+            for name,b in books.items():
+                tmp=RULES/(name+'.tmp');tmp.write_text(json.dumps(b,ensure_ascii=False),encoding='utf-8');os.replace(tmp,RULES/name)
+        return {'imported':len(books),'books':[book_summary(b) for b in books.values()]}
 
 class Handler(SimpleHTTPRequestHandler):
     def guess_type(self,path):
@@ -190,10 +220,12 @@ class Handler(SimpleHTTPRequestHandler):
             self.reply({'error':'Only the local app can write data.'},403);return
         try:
             n=int(self.headers.get('Content-Length','0'))
-            limit=250 if urlparse(self.path).path=='/api/import' else 100
+            route=urlparse(self.path).path
+            limit=600 if route=='/api/rules/pack' else 250 if route in ['/api/import','/api/rules'] else 100
             if n<1 or n>limit*1024*1024:raise ValueError('Request exceeds the size limit.')
             raw=self.rfile.read(n);path=urlparse(self.path).path
-            if path=='/api/rules':
+            if path=='/api/rules/pack':self.reply(import_rulepack(raw))
+            elif path=='/api/rules':
                 args=parse_qs(urlparse(self.path).query)
                 self.reply(import_rulebook(raw,args.get('title',['Rulebook'])[0],args.get('edition',['2014'])[0]))
             elif path=='/api/rules/remove':
