@@ -38,6 +38,21 @@ class Storage(unittest.TestCase):
         p[NameObject('/Annots')]=ArrayObject(refs);w._root_object[NameObject('/AcroForm')]=DictionaryObject({NameObject('/Fields'):ArrayObject(refs)})
         raw=io.BytesIO();w.write(raw);r=server.parse_pdf(raw.getvalue())
         self.assertEqual((r['name'],r['maxHp'],r['ac'],r['abilities']['str']),('Test Hero',32,17,16))
+    def test_05_rulebooks_and_portable_index(self):
+        from pypdf.generic import DecodedStreamObject
+        w=PdfWriter();p=w.add_blank_page(width=600,height=800)
+        font=DictionaryObject({NameObject('/Type'):NameObject('/Font'),NameObject('/Subtype'):NameObject('/Type1'),NameObject('/BaseFont'):NameObject('/Helvetica')})
+        p[NameObject('/Resources')]=DictionaryObject({NameObject('/Font'):DictionaryObject({NameObject('/F1'):w._add_object(font)})})
+        stream=DecodedStreamObject();stream.set_data(b'BT /F1 12 Tf 20 700 Td (Concentration test reference.) Tj ET');p[NameObject('/Contents')]=w._add_object(stream)
+        raw=io.BytesIO();w.write(raw)
+        book=server.import_rulebook(raw.getvalue(),'Rules test','2014')
+        self.assertEqual(book['searchablePages'],1)
+        saved=json.loads((server.RULES/(book['id']+'.json')).read_text(encoding='utf-8'))
+        self.assertIn('Concentration',saved['pages'][0])
+        server.write_workspace(self.state);package=server.export_package()
+        (server.RULES/(book['id']+'.json')).unlink();server.import_package(package)
+        self.assertTrue((server.RULES/(book['id']+'.json')).exists())
+
     def test_04_local_api(self):
         http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler);http.app_origin=f'http://127.0.0.1:{http.server_port}'
         threading.Thread(target=http.serve_forever,daemon=True).start()

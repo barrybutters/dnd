@@ -10,6 +10,7 @@ DATA=Path(os.environ.get('EMBER_TABLE_DATA') or (Path(os.environ.get('LOCALAPPDA
 DATA.mkdir(parents=True,exist_ok=True)
 ASSETS=DATA/'assets';ASSETS.mkdir(exist_ok=True)
 BACKUPS=DATA/'backups';BACKUPS.mkdir(exist_ok=True)
+RULES=DATA/'rulebooks';RULES.mkdir(exist_ok=True)
 LOCK=threading.RLock()
 ASSET_RE=re.compile(r'^[a-f0-9]{32}\.(png|jpg|jpeg|webp|gif|mp3|wav|ogg|m4a|pdf)$')
 
@@ -86,28 +87,61 @@ def export_package():
             z.writestr('workspace.json',json.dumps(data,ensure_ascii=False))
             for p in ASSETS.iterdir():
                 if ASSET_RE.fullmatch(p.name):z.write(p,'assets/'+p.name)
+            for p in RULES.glob('*.json'):
+                if re.fullmatch(r'[a-f0-9]{32}\.json',p.name):z.write(p,'rulebooks/'+p.name)
         return b.getvalue()
 
 def import_package(raw):
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         infos=z.infolist()
-        if len(infos)>2000 or sum(i.file_size for i in infos)>250*1024*1024:raise ValueError('Package too large (250 MB expanded maximum).')
+        if len(infos)>2000 or sum(i.file_size for i in infos)>500*1024*1024:raise ValueError('Package too large (500 MB expanded maximum).')
         if 'workspace.json' not in z.namelist():raise ValueError('Missing workspace.json')
         data=validate(json.loads(z.read('workspace.json')))
-        assets={}
+        assets={};books={}
         for i in infos:
             if i.filename=='workspace.json':continue
-            if not i.filename.startswith('assets/') or not ASSET_RE.fullmatch(i.filename[7:]):raise ValueError('Invalid package path')
-            assets[i.filename[7:]]=z.read(i)
+            if i.filename.startswith('rulebooks/') and re.fullmatch(r'[a-f0-9]{32}\.json',i.filename[10:]):
+                book=json.loads(z.read(i));validate_book(book);books[i.filename[10:]]=z.read(i)
+            elif i.filename.startswith('assets/') and ASSET_RE.fullmatch(i.filename[7:]):assets[i.filename[7:]]=z.read(i)
+            else:raise ValueError('Invalid package path')
         with LOCK:
             for name,content in assets.items():
                 p=ASSETS/name
                 if p.exists() and p.read_bytes()!=content:raise ValueError('Asset identifier conflict. Restore into a fresh data folder.')
             for name,content in assets.items():(ASSETS/name).write_bytes(content)
+            for name,content in books.items():(RULES/name).write_bytes(content)
             write_workspace(data)
     return data
 
+
+def validate_book(book):
+    if not isinstance(book,dict) or not re.fullmatch(r'[a-f0-9]{32}',book.get('id','')) or book.get('edition') not in ['2014','2024'] or not isinstance(book.get('pages'),list):raise ValueError('Invalid rulebook index')
+    if not all(isinstance(p,str) for p in book['pages']):raise ValueError('Invalid book text')
+    return book
+
+def book_summary(book):
+    return {k:book[k] for k in ['id','title','edition','url','pageCount','searchablePages']}
+
+def import_rulebook(raw,title,edition):
+    if edition not in ['2014','2024']:raise ValueError('Choose a rules edition.')
+    if len(raw)>80*1024*1024:raise ValueError('Rulebook PDFs must be under 80 MB.')
+    reader=PdfReader(io.BytesIO(raw))
+    if reader.is_encrypted:raise ValueError('Use an unlocked PDF.')
+    if not 1<=len(reader.pages)<=2000:raise ValueError('Use a PDF with 1 to 2000 pages.')
+    pages=[]
+    for page in reader.pages:
+        try:pages.append((page.extract_text() or '')[:100000])
+        except Exception:pages.append('')
+    bid=uuid.uuid4().hex;asset_name=uuid.uuid4().hex+'.pdf'
+    book={'id':bid,'title':str(title or 'Rulebook')[:200],'edition':edition,'url':'/assets/'+asset_name,'pageCount':len(pages),'searchablePages':sum(bool(p.strip()) for p in pages),'pages':pages}
+    with LOCK:
+        (ASSETS/asset_name).write_bytes(raw)
+        tmp=RULES/(bid+'.tmp');tmp.write_text(json.dumps(book,ensure_ascii=False),encoding='utf-8');os.replace(tmp,RULES/(bid+'.json'))
+    return book_summary(book)
+
 class Handler(SimpleHTTPRequestHandler):
+    def guess_type(self,path):
+        return 'application/javascript' if str(path).endswith('.mjs') else super().guess_type(path)
     def log_message(self,*args):pass
     def __init__(self,*a,**kw):super().__init__(*a,directory=str(BASE/'app'),**kw)
     def send_bytes(self,data,mime,filename=None):
@@ -122,6 +156,23 @@ class Handler(SimpleHTTPRequestHandler):
             if path=='/api/workspace':self.reply(read_workspace())
             elif path=='/api/backups':self.reply([{'id':p.name,'time':p.stat().st_mtime} for p in sorted(BACKUPS.glob('*.json'),reverse=True)])
             elif path=='/api/export':self.send_bytes(export_package(),'application/zip','Ember-Table-Campaigns.zip')
+            elif path=='/api/rules':
+                books=[]
+                for p in RULES.glob('*.json'):
+                    try:books.append(book_summary(validate_book(json.loads(p.read_text(encoding='utf-8')))))
+                    except (ValueError,KeyError):continue
+                self.reply(books)
+            elif path.startswith('/api/rules/'):
+                bid=path.rsplit('/',1)[-1]
+                if not re.fullmatch(r'[a-f0-9]{32}',bid):raise ValueError('Invalid book')
+                book=validate_book(json.loads((RULES/(bid+'.json')).read_text(encoding='utf-8')))
+                q=parse_qs(urlparse(self.path).query).get('q',[''])[0].strip()[:200]
+                matches=[]
+                if q:
+                    for i,text in enumerate(book['pages']):
+                        n=text.casefold().find(q.casefold())
+                        if n>=0:matches.append({'page':i+1,'snippet':text[max(0,n-80):n+180]})
+                self.reply({'book':book_summary(book),'matches':matches[:200],'total':len(matches)})
             elif path=='/api/display':
                 s=read_workspace() or {};c=next((c for c in s.get('campaigns',[]) if c.get('id')==s.get('selected')),{});m=next((m for m in c.get('maps',[]) if m.get('id')==c.get('activeMap')),None)
                 if m:
@@ -139,9 +190,17 @@ class Handler(SimpleHTTPRequestHandler):
             self.reply({'error':'Only the local app can write data.'},403);return
         try:
             n=int(self.headers.get('Content-Length','0'))
-            if n<1 or n>100*1024*1024:raise ValueError('Request must be under 100 MB.')
+            limit=250 if urlparse(self.path).path=='/api/import' else 100
+            if n<1 or n>limit*1024*1024:raise ValueError('Request exceeds the size limit.')
             raw=self.rfile.read(n);path=urlparse(self.path).path
-            if path=='/api/pdf':self.reply(parse_pdf(raw))
+            if path=='/api/rules':
+                args=parse_qs(urlparse(self.path).query)
+                self.reply(import_rulebook(raw,args.get('title',['Rulebook'])[0],args.get('edition',['2014'])[0]))
+            elif path=='/api/rules/remove':
+                bid=json.loads(raw).get('id','')
+                if not re.fullmatch(r'[a-f0-9]{32}',bid):raise ValueError('Invalid book')
+                (RULES/(bid+'.json')).unlink(missing_ok=True);self.reply({'removed':True})
+            elif path=='/api/pdf':self.reply(parse_pdf(raw))
             elif path=='/api/workspace':write_workspace(json.loads(raw));self.reply({'saved':True})
             elif path=='/api/import':self.reply(import_package(raw))
             elif path=='/api/recover':

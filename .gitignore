@@ -5,3 +5,7 @@ installer-output/
 __pycache__/
 *.pyc
 data/
+node_modules/
+app/vendor/
+package-lock.json
+ui-workspace.png

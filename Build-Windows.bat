@@ -5,6 +5,10 @@ py -3 -m venv .build-env
 if errorlevel 1 goto fail
 .build-env\Scripts\python.exe -m pip install pyinstaller pywebview pypdf
 if errorlevel 1 goto fail
+call npm install --no-save pdfjs-dist
+if errorlevel 1 goto fail
+node scripts/prepare-pdf.cjs
+if errorlevel 1 goto fail
 .build-env\Scripts\python.exe -m PyInstaller --clean --noconfirm EmberTable.spec
 if errorlevel 1 goto fail
 set "EMBER_ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
@@ -16,7 +20,7 @@ if not exist "%EMBER_ISCC%" (
 )
 "%EMBER_ISCC%" installer.iss
 if errorlevel 1 goto fail
-echo Installer created: installer-output\EmberTable-Setup-0.2.0.exe
+echo Installer created: installer-output\EmberTable-Setup-0.3.0.exe
 pause
 exit /b 0
 :fail
