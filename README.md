@@ -1,4 +1,4 @@
-# Ember Table 0.3.3
+# Ember Table 0.4.0
 
 An offline Windows campaign companion for dungeon masters and players.
 
@@ -36,5 +36,21 @@ Private book packs may be imported from either rules shelf using Import book pac
 ## Deleting records
 Campaign settings on Overview and Campaign include Delete campaign, with an exact-name confirmation. Deleting the last campaign leaves a genuinely empty workspace. Shared rulebooks stay available. Undo works during the current session, and automatic disk backups can restore older workspace revisions. Record delete buttons cover characters, journal entries, quests, sessions, NPCs, items, encounter plans/combatants, maps/tokens, wiki pages/attachments, spells/actions/resources, audio, reference entries and rolls. Deleting a character removes linked combatants and moves its items to party inventory. Removing a container leaves its contents in inventory. Attachment removal unlinks a file; its copied asset may remain on disk. Rulebook removal is separate from campaign undo.
 
-## Book import fix in 0.3.3
+## Book import fix in 0.4.0
 The desktop book-pack button now uses the native Windows file chooser through the pywebview bridge. ZIP contents are streamed into a staging folder, checked, and installed without buffering the full pack. A persistent progress dialog shows completion or specific errors. Closing the app waits for an active import. Browser fallback uses an attached file input. Regression coverage includes the packaged EXE's actual Windows file dialog and a generated 390 MiB five-book fixture; no supplied books enter the public build runner.
+
+
+## Version 0.4.0 — offline studio and campaign preparation
+
+- Map studio: ten deterministic terrain textures, soft round brushes, size/opacity controls, thirty original canvas stamps across six categories, image stamp import, scatter, mirror, rotation, freehand paths/walls/filled shapes, labels, selection/movement and editable size/rotation/opacity. Visible layers have independent opacity, ordering and locks. Add custom layers, duplicate maps/templates, or try the starter landscape. Delete removes an entire artwork object/stroke. Maximum 5,000 artwork objects per map; battle maps remain 8–60 squares per side.
+- Map PNG export at 1×/2×/4× pixel dimensions with player fog or artwork-only options. Transparent image stamps are supported. Artwork is original procedural illustration, not Inkarnate's proprietary art collection. This is a local editor, not an Inkarnate-compatible file importer.
+- TV: select a connected Windows display and fullscreen/windowed player view; F11 toggles fullscreen. Rotation, scaling and a black-screen switch are in its hover toolbar. Connect HDMI or use Windows casting (Win+K) and Extend (Win+P) first. No network game server or multiplayer has been added. The Windows regression runner validates one monitor and native fullscreen; physical TVs, drivers and wireless casting require testing on the user's hardware.
+- Three-step campaign setup: 2014/2024 edition, party placeholders, premise, session-zero notes and opening session. No existing campaigns are replaced.
+- Five-step character builder: identity, standard array/27-point buy/manual abilities, proficiencies/features, equipment/spells, review. Twelve class starting hit dice/save proficiencies plus custom class; calculated starting HP and proficiency. Class features, legal skill selections, ancestry/background ability increases, spell levels/slots, equipment details and multiclass choices need book review. Level-up records HP, abilities, feature notes and new spells; adjust retroactive Constitution HP and resources manually.
+- Bestiary: search imported PDFs and review page text/HP/AC into editable monster entries; deploy groups to encounters with linked map tokens, hidden by default, and source-page links. Extraction is page-based and can include other monsters or headers. Scanned pages require manual entry; no OCR or automatic complete structured Monster Manual database.
+- Custom DM screen: choose/order party, initiative, bookmarked rules, scratchpad, quests and condition reminders.
+- Relationship board: draggable original nodes, labelled edges and links to wiki/NPC/quest records. DM workspace only.
+- Recaps: select journal/session/completed quest sources and assemble editable text plus checklist. This is local text assembly, not AI summarisation. Text export available.
+- Diagnostics: installed version, save/import flags, disk write check, free space, backup/book counts and recent UI errors. Review/copy/export the report. Reports exclude campaign content; technical errors can still merit review before sharing.
+
+Existing workspace and book-pack imports, native chooser regression, backups and delete controls remain covered by checks. Data format additions are backward compatible with 0.3.3 workspaces. Upgrading keeps data in the same local folder. Do not run two app versions against the same data directory simultaneously.

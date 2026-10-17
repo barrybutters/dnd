@@ -178,6 +178,18 @@ class Handler(SimpleHTTPRequestHandler):
         path=urlparse(self.path).path
         try:
             if path=='/api/workspace':self.reply(read_workspace())
+            elif path=='/api/diagnostics':
+                writable=False
+                try:
+                    probe=DATA/('health-'+uuid.uuid4().hex+'.tmp')
+                    probe.write_text('ok');probe.unlink();writable=True
+                except OSError:pass
+                readable=False
+                try:readable=isinstance(read_workspace(),dict)
+                except ValueError:pass
+                self.reply({'version':'0.4.0','platform':sys.platform,'python':sys.version.split()[0],
+                    'workspaceReadable':readable,'writable':writable,'freeMiB':shutil.disk_usage(DATA).free//(1024*1024),
+                    'backups':len(list(BACKUPS.glob('*.json'))),'books':len(list(RULES.glob('*.json')))})
             elif path=='/api/backups':self.reply([{'id':p.name,'time':p.stat().st_mtime} for p in sorted(BACKUPS.glob('*.json'),reverse=True)])
             elif path=='/api/export':self.send_bytes(export_package(),'application/zip','Ember-Table-Campaigns.zip')
             elif path.startswith('/api/import-status/'):
@@ -195,7 +207,11 @@ class Handler(SimpleHTTPRequestHandler):
                 bid=path.rsplit('/',1)[-1]
                 if not re.fullmatch(r'[a-f0-9]{32}',bid):raise ValueError('Invalid book')
                 book=validate_book(json.loads((RULES/(bid+'.json')).read_text(encoding='utf-8')))
-                q=parse_qs(urlparse(self.path).query).get('q',[''])[0].strip()[:200]
+                params=parse_qs(urlparse(self.path).query)
+                if 'page' in params:
+                    n=max(1,min(len(book['pages']),int(params['page'][0])))
+                    self.reply({'book':book_summary(book),'page':n,'text':book['pages'][n-1]});return
+                q=params.get('q',[''])[0].strip()[:200]
                 matches=[]
                 if q:
                     for i,text in enumerate(book['pages']):

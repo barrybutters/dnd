@@ -26,11 +26,19 @@ def main():
             except Exception as e:
                 trace('Chooser error: '+str(e))
                 return {'error':str(e)}
-        def open_display(self):
-            webview.create_window('Ember Table · Player Display',http.app_origin+'/display.html',width=1200,height=850)
+        def display_screens(self):
+            return [{'width':s.width,'height':s.height} for s in webview.screens]
+        def open_display(self, screen_index=0, fullscreen=False):
+            screens=webview.screens
+            index=max(0,min(int(screen_index),len(screens)-1))
+            class DisplayAPI:
+                def fullscreen(self):
+                    display.toggle_fullscreen()
+                    return True
+            display=webview.create_window('Ember Table · Player Display',http.app_origin+'/display.html',width=1200,height=850,screen=screens[index] if screens else None,fullscreen=bool(fullscreen),js_api=DisplayAPI())
             return True
     try:
-        main_window=webview.create_window('Ember Table 0.3.3',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
+        main_window=webview.create_window('Ember Table 0.4.0',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
         def before_close():
             try:
                 pending=main_window.evaluate_js("Boolean(window.__saving || window.__scratchPending || window.__bookImporting)")
