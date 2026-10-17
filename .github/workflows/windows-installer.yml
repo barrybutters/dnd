@@ -46,7 +46,7 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'EmberTableInstalled'
-          $setup = Start-Process 'installer-output\EmberTable-Setup-0.3.1.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
+          $setup = Start-Process 'installer-output\EmberTable-Setup-0.3.2.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           $exe = Join-Path $target 'EmberTable.exe'
           if (!(Test-Path $exe)) { throw 'Installed executable missing' }
@@ -72,8 +72,8 @@ jobs:
       - name: Verify installer exists
         shell: pwsh
         run: |
-          if (!(Test-Path 'installer-output\EmberTable-Setup-0.3.1.exe')) { throw 'Installer missing' }
-          Get-FileHash 'installer-output\EmberTable-Setup-0.3.1.exe' -Algorithm SHA256 | Format-List | Out-File 'installer-output\SHA256.txt'
+          if (!(Test-Path 'installer-output\EmberTable-Setup-0.3.2.exe')) { throw 'Installer missing' }
+          Get-FileHash 'installer-output\EmberTable-Setup-0.3.2.exe' -Algorithm SHA256 | Format-List | Out-File 'installer-output\SHA256.txt'
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:

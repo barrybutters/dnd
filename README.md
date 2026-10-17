@@ -1,4 +1,4 @@
-# Ember Table 0.3.1
+# Ember Table 0.3.2
 
 An offline Windows campaign companion for dungeon masters and players.
 
@@ -32,3 +32,6 @@ Third-party PDF processing: pypdf (BSD-3-Clause); license in `vendor/pypdf-LICEN
 Import your own rulebook PDFs from either rules tab. The source PDFs and search indexes stay under the local EmberTable data folder. They are included in portable ZIP exports and are not sent to GitHub or external services. PDF imports support up to 200 MB and 2000 pages per book. Scanned books can be rendered, but text search requires a readable text layer. Books marked as removed disappear from the shelf; their copied PDF assets may remain until the data folder is manually cleaned. The two edition tabs are separate shelves, not automated rules engines. PDF.js is bundled offline during the build under its included Apache-2.0 license.
 
 Private book packs may be imported from either rules shelf using Import book pack. This adds books without replacing campaign data. Book packs are limited to 600 MB compressed and 1 GB expanded. PDFs from local book packs are not part of the public source repository or generic installer.
+
+## Deleting records
+Campaign settings on Overview and Campaign include Delete campaign, with an exact-name confirmation. Deleting the last campaign leaves a genuinely empty workspace. Shared rulebooks stay available. Undo works during the current session, and automatic disk backups can restore older workspace revisions. Record delete buttons cover characters, journal entries, quests, sessions, NPCs, items, encounter plans/combatants, maps/tokens, wiki pages/attachments, spells/actions/resources, audio, reference entries and rolls. Deleting a character removes linked combatants and moves its items to party inventory. Removing a container leaves its contents in inventory. Attachment removal unlinks a file; its copied asset may remain on disk. Rulebook removal is separate from campaign undo.

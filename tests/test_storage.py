@@ -68,6 +68,10 @@ class Storage(unittest.TestCase):
         self.assertEqual(server.import_rulepack(raw.getvalue())['imported'],1)
         self.assertEqual((server.ASSETS/asset).read_bytes(),b'%PDF-test')
 
+    def test_07_empty_workspace_persists(self):
+        server.write_workspace({'campaigns':[]})
+        self.assertEqual(server.read_workspace()['campaigns'],[])
+
     def test_04_local_api(self):
         http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler);http.app_origin=f'http://127.0.0.1:{http.server_port}'
         threading.Thread(target=http.serve_forever,daemon=True).start()

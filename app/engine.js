@@ -12,7 +12,7 @@ function rollExpression(expr,rng){let m=String(expr).replace(/\s/g,'').match(/^(
 
 const finite=(v,fallback=0,min=-999999,max=999999)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):fallback;
 function sanitize(s,id){
-    if(!s||!Array.isArray(s.campaigns)||!s.campaigns.length)throw Error('A workspace needs at least one campaign.');
+    if(!s||!Array.isArray(s.campaigns))throw Error('Invalid workspace.');
     const goodId=o=>{if(!/^[a-zA-Z0-9_-]{1,100}$/.test(o.id||''))o.id=id()};
     s.settings=typeof s.settings==='object'&&s.settings?s.settings:{};
     if(!/^#[a-f0-9]{6}$/i.test(s.settings.diceColor||''))s.settings.diceColor='#d7b471';

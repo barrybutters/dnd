@@ -15,7 +15,7 @@ LOCK=threading.RLock()
 ASSET_RE=re.compile(r'^[a-f0-9]{32}\.(png|jpg|jpeg|webp|gif|mp3|wav|ogg|m4a|pdf)$')
 
 def validate(data):
-    if not isinstance(data,dict) or not isinstance(data.get('campaigns'),list) or not data['campaigns'] or len(data['campaigns'])>200:raise ValueError('Invalid workspace')
+    if not isinstance(data,dict) or not isinstance(data.get('campaigns'),list) or len(data['campaigns'])>200:raise ValueError('Invalid workspace')
     for c in data['campaigns']:
         if not isinstance(c,dict) or not isinstance(c.get('name'),str):raise ValueError('Invalid campaign')
     return data
