@@ -6,6 +6,10 @@ import server
 def main():
     import webview
     webview.settings['ALLOW_DOWNLOADS'] = True
+    qa_port=next((int(a.split('=',1)[1]) for a in sys.argv[1:] if a.startswith('--qa-port=')),None)
+    if qa_port:
+        webview.settings['REMOTE_DEBUGGING_PORT']=qa_port
+        webview.settings['OPEN_DEVTOOLS_IN_DEBUG']=False
     http = server.ThreadingHTTPServer(('127.0.0.1', 0),server.Handler)
     http.app_origin = f'http://127.0.0.1:{http.server_port}'
     threading.Thread(target=http.serve_forever,daemon=True).start()
@@ -30,7 +34,7 @@ def main():
             except Exception:
                 pass
         main_window.events.closing += before_close
-        webview.start(gui='edgechromium',private_mode=False,storage_path=str(server.DATA/'webview'))
+        webview.start(gui='edgechromium',debug=bool(qa_port),private_mode=False,storage_path=str(server.DATA/'webview'))
     finally:
         http.shutdown()
         http.server_close()
