@@ -16,4 +16,8 @@ with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile:
         else:raise RuntimeError('The WebView2 test connection did not open')
         code=subprocess.run(['node','tests/native-pack.cjs',str(port),'tests/large pack fixture.zip'],timeout=180).returncode
         if code:raise RuntimeError('Native book import regression test failed')
-    finally:subprocess.run(['taskkill','/PID',str(app.pid),'/T','/F'],capture_output=True)
+    finally:
+        for name in ['book-import-log.txt','startup-error.txt']:
+            log=Path(profile)/'EmberTable'/name
+            if log.exists():print(name+':\n'+log.read_text(encoding='utf-8'),flush=True)
+        subprocess.run(['taskkill','/PID',str(app.pid),'/T','/F'],capture_output=True)

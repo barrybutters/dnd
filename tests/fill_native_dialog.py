@@ -1,22 +1,23 @@
-"""Select the synthetic ZIP using the actual Windows file dialog."""
+"""Select the synthetic ZIP in the real Windows common Open dialog."""
 import sys,time
 from pathlib import Path
 from pywinauto import Desktop
 path=str(Path(sys.argv[1]).resolve())
 try:
-    dlg=Desktop(backend='uia').window(class_name='#32770',title_re='.*(Open|Select).*')
-    dlg.wait('visible',timeout=30);dlg.set_focus()
-    field=dlg.child_window(auto_id='1148',control_type='Edit')
-    if not field.exists(timeout=2):
-        fields=dlg.descendants(control_type='Edit')
-        if not fields:raise RuntimeError('No filename entry found in the native dialog')
-        field=fields[-1]
-    field.set_edit_text(path)
-    button=dlg.child_window(auto_id='1',control_type='Button')
-    if not button.exists(timeout=2):button=dlg.child_window(title='Open',control_type='Button')
-    button.invoke()
+    # Win32 sees owned common dialogs even when the UIA tree nests them under WebView2.
+    dlg=Desktop(backend='win32').window(class_name='#32770',visible_only=True)
+    dlg.wait('visible',timeout=25)
+    print('Native dialog title:',dlg.window_text(),flush=True)
+    field=dlg.child_window(control_id=1148)
+    if field.exists(timeout=1):
+        try:field.set_edit_text(path)
+        except Exception:field.child_window(class_name='Edit').set_edit_text(path)
+    else:
+        fields=dlg.descendants(class_name='Edit')
+        if not fields:raise RuntimeError('No filename edit control in native Open dialog')
+        fields[-1].set_edit_text(path)
+    dlg.child_window(control_id=1).click()
     print('Selected synthetic ZIP through native Windows dialog',flush=True)
 except Exception:
-    try:dlg.print_control_identifiers()
-    except Exception:pass
+    print('Visible native windows:',[(w.class_name(),w.window_text()) for w in Desktop(backend='win32').windows() if w.is_visible()],flush=True)
     raise

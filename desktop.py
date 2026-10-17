@@ -15,11 +15,17 @@ def main():
     threading.Thread(target=http.serve_forever,daemon=True).start()
     class DesktopAPI:
         def choose_rulepack(self):
+            def trace(message):
+                with (server.DATA/'book-import-log.txt').open('a',encoding='utf-8') as log:log.write(message+'\n')
             try:
+                trace('Native book chooser requested')
                 selected=main_window.create_file_dialog(webview.FileDialog.OPEN,allow_multiple=False,file_types=('Ember Table book packs (*.zip)',))
+                trace('Native chooser returned '+('a selected file' if selected else 'cancelled'))
                 if not selected:return {'cancelled':True}
                 return server.start_book_import(selected[0])
-            except Exception as e:return {'error':str(e)}
+            except Exception as e:
+                trace('Chooser error: '+str(e))
+                return {'error':str(e)}
         def open_display(self):
             webview.create_window('Ember Table · Player Display',http.app_origin+'/display.html',width=1200,height=850)
             return True
