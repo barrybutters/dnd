@@ -9,5 +9,54 @@ function damage(x,amount){let n=Number(amount);if(n>0){let used=Math.min(x.tempH
 function skill(x,name){return Object.hasOwn(x.skills,name)?Number(x.skills[name]):mod(x.abilities[skills[name]])+(x.proficiencies.includes(name)?prof(x.level):0)}
 function distance(a,b,feet=5){return Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y))*feet}
 function rollExpression(expr,rng){let m=String(expr).replace(/\s/g,'').match(/^(\d{1,3})d(\d{1,4})([+-]\d{1,5})?$/i);if(!m||+m[1]<1||+m[1]>100||+m[2]<2||+m[2]>1000)throw Error('Use 1–100 dice with 2–1000 sides, such as 2d6+3.');let values=Array.from({length:+m[1]},()=>rng(+m[2])),modifier=+(m[3]||0);return{expr,values,sides:+m[2],modifier,total:values.reduce((a,b)=>a+b,modifier)}}
-root.EmberEngine={skills,mod,prof,map,normalize,normalizeCharacter,damage,skill,distance,rollExpression};
+
+const finite=(v,fallback=0,min=-999999,max=999999)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):fallback;
+function sanitize(s,id){
+    if(!s||!Array.isArray(s.campaigns)||!s.campaigns.length)throw Error('A workspace needs at least one campaign.');
+    const goodId=o=>{if(!/^[a-zA-Z0-9_-]{1,100}$/.test(o.id||''))o.id=id()};
+    s.settings=typeof s.settings==='object'&&s.settings?s.settings:{};
+    if(!/^#[a-f0-9]{6}$/i.test(s.settings.diceColor||''))s.settings.diceColor='#d7b471';
+    s.rolls=Array.isArray(s.rolls)?s.rolls.filter(x=>x&&typeof x==='object').slice(0,100):[];
+    s.campaigns.forEach(c=>{
+        goodId(c);c.name=String(c.name||'Campaign');
+        for(const k of ['notes','characters','quests','npcs','sessions','items','combat','wiki','timeline','encounterPlans','library','audio','attachments']){
+            c[k]=Array.isArray(c[k])?c[k].filter(x=>x&&typeof x==='object'&&!Array.isArray(x)):[];
+            c[k].forEach(x=>goodId(x));
+        }
+        c.maps=Array.isArray(c.maps)?c.maps.filter(m=>m&&typeof m==='object'):[];
+        c.maps.forEach(m=>{
+            goodId(m);m.w=Math.round(finite(m.w,24,8,60));m.h=Math.round(finite(m.h,24,8,60));m.feet=finite(m.feet,5,1,100);
+            m.cells=Array.from({length:m.w*m.h},(_,i)=>Math.round(finite(m.cells?.[i],0,0,5)));
+            m.fog=Array.from({length:m.w*m.h},(_,i)=>Boolean(m.fog?.[i]));
+            m.tokens=Array.isArray(m.tokens)?m.tokens.filter(t=>t&&typeof t==='object'):[];
+            m.tokens.forEach(t=>{goodId(t);t.x=Math.round(finite(t.x,0,0,m.w-1));t.y=Math.round(finite(t.y,0,0,m.h-1));if(!/^#[a-f0-9]{6}$/i.test(t.color||''))t.color='#dbb576'});
+            m.marks=Array.isArray(m.marks)?m.marks.filter(v=>v&&Array.isArray(v.points)):[];
+            m.marks.forEach(mark=>{mark.points=mark.points.filter(p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(Number(n))));if(!/^#[a-f0-9]{6}$/i.test(mark.color||''))mark.color='#dbb576';mark.width=finite(mark.width,3,1,12)});
+        });
+    });
+    normalize(s,id);
+    s.campaigns.forEach(c=>{
+        c.round=Math.round(finite(c.round,1,1));c.turn=Math.round(finite(c.turn,0,0,Math.max(0,c.combat.length-1)));
+        c.coins=Object.fromEntries(['cp','sp','ep','gp','pp'].map(k=>[k,finite(c.coins[k],0,0)]));
+        c.characters.forEach(x=>{
+            x.name=String(x.name||'Adventurer');x.level=finite(x.level,1,1,100);x.maxHp=finite(x.maxHp,10,1);x.hp=finite(x.hp,x.maxHp,0,x.maxHp);x.tempHp=finite(x.tempHp,0,0);x.ac=finite(x.ac,10,0);x.speed=finite(x.speed,30,0);
+            x.abilities=Object.fromEntries(['str','dex','con','int','wis','cha'].map(k=>[k,finite(x.abilities[k],10,0,99)]));
+            x.skills=Object.fromEntries(Object.keys(skills).filter(k=>Object.hasOwn(x.skills,k)).map(k=>[k,finite(x.skills[k],0,-99,999)]));
+            for(const k of ['proficiencies','saveProf','conditions'])x[k]=Array.isArray(x[k])?x[k].map(String):[];
+            for(const k of ['actions','spells','resources']){x[k]=Array.isArray(x[k])?x[k].filter(v=>v&&typeof v==='object'):[];x[k].forEach(v=>goodId(v))}
+            x.actions.forEach(a=>a.bonus=finite(a.bonus,0,-99,999));
+            x.spells.forEach(sp=>sp.level=Math.round(finite(sp.level,0,0,9)));
+            x.resources.forEach(r=>{r.max=finite(r.max,1,0);r.remaining=finite(r.remaining,r.max,0,r.max)});
+            x.slots=Array.from({length:9},(_,i)=>{let slot=x.slots?.[i]||{},max=finite(slot.max,0,0);return{max,used:finite(slot.used,0,0,max)}});
+            x.death={success:finite(x.death?.success,0,0,3),failure:finite(x.death?.failure,0,0,3)};
+            x.currency=Object.fromEntries(['cp','sp','ep','gp','pp'].map(k=>[k,finite(x.currency[k],0,0)]));
+        });
+        c.combat.forEach(x=>{x.maxHp=finite(x.maxHp,x.hp||10,1);x.hp=finite(x.hp,x.maxHp,0,x.maxHp);x.ac=finite(x.ac,10,0);x.initiative=finite(x.initiative,0,-99,999);x.effects=Array.isArray(x.effects)?x.effects.filter(e=>e&&typeof e==='object'):[]});
+        c.items.forEach(x=>{x.quantity=finite(x.quantity,1,0);x.weight=finite(x.weight,0,0)});
+        c.timeline.forEach(x=>x.day=finite(x.day,1,1));
+        c.calendar.day=finite(c.calendar.day,1,1);c.calendar.year=finite(c.calendar.year,1,0);
+    });return s;
+}
+
+root.EmberEngine={skills,mod,prof,map,normalize:sanitize,normalizeCharacter,damage,skill,distance,rollExpression};
 })(typeof module==='object'?module.exports:globalThis);
