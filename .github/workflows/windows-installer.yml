@@ -16,7 +16,7 @@ jobs:
           python-version: '3.12'
           architecture: x64
       - name: Install build dependencies
-        run: python -m pip install pyinstaller pywebview pypdf
+        run: python -m pip install pyinstaller pywebview pypdf pywinauto
       - name: Check source syntax
         run: python -m py_compile desktop.py server.py
       - name: Test storage and engine
@@ -46,7 +46,7 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'EmberTableInstalled'
-          $setup = Start-Process 'installer-output\EmberTable-Setup-0.3.2.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
+          $setup = Start-Process 'installer-output\EmberTable-Setup-0.3.3.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           $exe = Join-Path $target 'EmberTable.exe'
           if (!(Test-Path $exe)) { throw 'Installed executable missing' }
@@ -69,11 +69,15 @@ jobs:
           $uninstall = Start-Process (Join-Path $target 'unins000.exe') -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
           if ($uninstall.ExitCode -ne 0) { throw 'Uninstall failed' }
           if (!(Test-Path (Join-Path $env:LOCALAPPDATA 'EmberTable\workspace.json'))) { throw 'Uninstall deleted campaign data' }
+      - name: Verify native Windows book chooser and large pack import
+        run: |
+          python tests/make_large_rulepack.py
+          python tests/native-pack.py "dist/EmberTable/EmberTable.exe"
       - name: Verify installer exists
         shell: pwsh
         run: |
-          if (!(Test-Path 'installer-output\EmberTable-Setup-0.3.2.exe')) { throw 'Installer missing' }
-          Get-FileHash 'installer-output\EmberTable-Setup-0.3.2.exe' -Algorithm SHA256 | Format-List | Out-File 'installer-output\SHA256.txt'
+          if (!(Test-Path 'installer-output\EmberTable-Setup-0.3.3.exe')) { throw 'Installer missing' }
+          Get-FileHash 'installer-output\EmberTable-Setup-0.3.3.exe' -Algorithm SHA256 | Format-List | Out-File 'installer-output\SHA256.txt'
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
@@ -85,6 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: EmberTable-UI-QA
-          path: ui-workspace.png
+          path: |
+            ui-workspace.png
+            native-import-qa.png
           if-no-files-found: ignore
-

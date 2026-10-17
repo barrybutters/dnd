@@ -9,3 +9,6 @@ node_modules/
 app/vendor/
 package-lock.json
 ui-workspace.png
+tests/*fixture.zip
+tests/*fixture.pdf
+native-import-qa.png

@@ -1,4 +1,4 @@
-# Ember Table 0.3.2
+# Ember Table 0.3.3
 
 An offline Windows campaign companion for dungeon masters and players.
 
@@ -35,3 +35,6 @@ Private book packs may be imported from either rules shelf using Import book pac
 
 ## Deleting records
 Campaign settings on Overview and Campaign include Delete campaign, with an exact-name confirmation. Deleting the last campaign leaves a genuinely empty workspace. Shared rulebooks stay available. Undo works during the current session, and automatic disk backups can restore older workspace revisions. Record delete buttons cover characters, journal entries, quests, sessions, NPCs, items, encounter plans/combatants, maps/tokens, wiki pages/attachments, spells/actions/resources, audio, reference entries and rolls. Deleting a character removes linked combatants and moves its items to party inventory. Removing a container leaves its contents in inventory. Attachment removal unlinks a file; its copied asset may remain on disk. Rulebook removal is separate from campaign undo.
+
+## Book import fix in 0.3.3
+The desktop book-pack button now uses the native Windows file chooser through the pywebview bridge. ZIP contents are streamed into a staging folder, checked, and installed without buffering the full pack. A persistent progress dialog shows completion or specific errors. Closing the app waits for an active import. Browser fallback uses an attached file input. Regression coverage includes the packaged EXE's actual Windows file dialog and a generated 390 MiB five-book fixture; no supplied books enter the public build runner.
