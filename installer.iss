@@ -1,0 +1,26 @@
+#define AppName "Ember Table"
+#define AppVersion "0.1.0"
+[Setup]
+AppId={{E930F682-54A4-4A14-8AA7-4B65FF7AFD17}
+AppName={#AppName}
+AppVersion={#AppVersion}
+DefaultDirName={localappdata}\Programs\EmberTable
+DefaultGroupName={#AppName}
+PrivilegesRequired=lowest
+OutputDir=installer-output
+OutputBaseFilename=EmberTable-Setup
+Compression=lzma2
+SolidCompression=yes
+WizardStyle=modern
+UninstallDisplayIcon={app}\EmberTable.exe
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+[Tasks]
+Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
+[Files]
+Source: "dist\EmberTable\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+[Icons]
+Name: "{group}\{#AppName}"; Filename: "{app}\EmberTable.exe"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\EmberTable.exe"; Tasks: desktopicon
+[Run]
+Filename: "{app}\EmberTable.exe"; Description: "Open Ember Table"; Flags: nowait postinstall skipifsilent

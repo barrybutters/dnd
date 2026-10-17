@@ -1,0 +1,7 @@
+.build-env/
+build/
+dist/
+installer-output/
+__pycache__/
+*.pyc
+data/
