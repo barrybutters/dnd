@@ -28,5 +28,6 @@ try:
  if result==0:result=subprocess.call(['node','tests/v05.cjs',http.app_origin],cwd=server.BASE)
  if result==0:result=subprocess.call(['node','tests/v06.cjs',http.app_origin],cwd=server.BASE)
  if result==0:result=subprocess.call(['node','tests/v062.cjs',http.app_origin],cwd=server.BASE)
+ if result==0:result=subprocess.call(['node','tests/v07.cjs',http.app_origin],cwd=server.BASE)
  sys.exit(result)
 finally:http.shutdown();http.server_close();fixture.unlink(missing_ok=True);pack.unlink(missing_ok=True);manual.unlink(missing_ok=True)

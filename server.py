@@ -204,7 +204,7 @@ class Handler(SimpleHTTPRequestHandler):
                 readable=False
                 try:readable=isinstance(read_workspace(),dict)
                 except ValueError:pass
-                self.reply({'version':'0.6.2','platform':sys.platform,'python':sys.version.split()[0],
+                self.reply({'version':'0.7.0','platform':sys.platform,'python':sys.version.split()[0],
                     'workspaceReadable':readable,'writable':writable,'freeMiB':shutil.disk_usage(DATA).free//(1024*1024),
                     'backups':len(list(BACKUPS.glob('*.json'))),'books':len(list(RULES.glob('*.json')))})
             elif path=='/api/backups':self.reply([{'id':p.name,'time':p.stat().st_mtime} for p in sorted(BACKUPS.glob('*.json'),reverse=True)])

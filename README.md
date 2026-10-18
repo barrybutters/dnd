@@ -1,4 +1,4 @@
-# Ember Table 0.6.2
+# Ember Table 0.7.0
 
 An offline Windows campaign companion for dungeon masters and players.
 
@@ -104,3 +104,10 @@ The installer repairs the desktop/Start menu shortcuts using an explicit version
 Monsters now embeds the selected local manual directly, with page navigation, zoom, saved reading position, direct PDF import and a default-PDF-app fallback. Search results can open a page as well as draft a stat block. Missing PDF assets are reported explicitly; Replace selected PDF preserves the book identity, bookmarks and saved monster references. Image-only PDFs can be read without searchable text. PDFs encrypted with a blank opening password are accepted; files requiring a password still need an unlocked copy.
 
 Notes is a dedicated tab in both roles, separate from shared party clues and the DM journal. Choose a named notebook or character, save notes with session labels, reopen/edit them in later sessions, pin, search, export or delete with undo. Player mode excludes DM notebook entries. Notebooks are local organization, not authentication or encryption against someone with access to the computer/data files. Notes are included in normal workspace saves, backups and exports.
+
+
+### 0.7: offline map and token template libraries
+
+Map library includes 100 original fixed designs: ten each of Forest & wilds, Roads & rivers, Dungeons, Caverns, Buildings, Settlements, Ruins & temples, Regions, Islands & coasts, and Worlds. Seventy are encounter scenes and thirty are overland designs. Search, filter, preview, export PNG or add an independent campaign copy with visible terrain or fog. Every layer, scenery object, room, road, label and pin remains editable; no remote image service is used. Atlas maps show suggested miles scales, while the existing tactical ruler still uses feet. Built-in originals cannot be deleted or overwritten by editing/deleting campaign copies.
+
+Token library includes 50 original vector adventurer portraits: ten archetypes in hooded, armoured, braided, bearded and masked styles. Place tokens on the active map, assign a portrait to a character, place that character on a map, edit existing token portraits, or export a transparent PNG. Portraits persist in campaigns/backups, render in the editor, PNG exports and separate player/TV window, and obey existing fog and hidden-token rules. These are generic character art templates, not rules or stat blocks.

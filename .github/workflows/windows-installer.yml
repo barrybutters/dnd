@@ -27,6 +27,7 @@ jobs:
           node tests/engine.cjs
           node tests/table-engine.cjs
           node tests/world-engine.cjs
+          node tests/templates.cjs
           python tests/test_dice_service.py
           python tests/test_manual.py
       - name: Test desktop interface in Edge
@@ -65,7 +66,7 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'EmberTableInstalled'
-          $setup = Start-Process 'installer-output\EmberTable-Setup-0.6.2.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
+          $setup = Start-Process 'installer-output\EmberTable-Setup-0.7.0.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           $exe = Join-Path $target 'EmberTable.exe'
           if (!(Test-Path $exe)) { throw 'Installed executable missing' }
@@ -76,7 +77,7 @@ jobs:
           $link = $shell.CreateShortcut($shortcutPath)
           if ($link.TargetPath -ne $exe) { throw 'Desktop shortcut targets the wrong executable' }
           $icon = ($link.IconLocation -split ',')[0]
-          if (!(Test-Path $icon) -or $icon -notmatch 'ember-table-0.6.2.ico$') { throw 'Shortcut icon path is broken' }
+          if (!(Test-Path $icon) -or $icon -notmatch 'ember-table-0.7.0.ico$') { throw 'Shortcut icon path is broken' }
           $icoBytes = [IO.File]::ReadAllBytes($icon)
           if ($icoBytes[2] -ne 1 -or $icoBytes.Length -lt 1024) { throw 'Shortcut icon is invalid' }
           $shell.Run('"' + $shortcutPath + '"',1,$false) | Out-Null
@@ -90,7 +91,7 @@ jobs:
             $candidate = "http://127.0.0.1:$($local.LocalPort)"
             try {
               $health = Invoke-RestMethod "$candidate/api/diagnostics" -TimeoutSec 3
-              if ($health.version -eq '0.6.2') { $origin = $candidate; break }
+              if ($health.version -eq '0.7.0') { $origin = $candidate; break }
             } catch { }
           }
           if (!$origin) { Stop-Process -Id $app.Id -Force; throw 'Desktop local server did not start' }
@@ -112,8 +113,8 @@ jobs:
       - name: Verify installer exists
         shell: pwsh
         run: |
-          if (!(Test-Path 'installer-output\EmberTable-Setup-0.6.2.exe')) { throw 'Installer missing' }
-          Get-FileHash 'installer-output\EmberTable-Setup-0.6.2.exe' -Algorithm SHA256 | Format-List | Out-File 'installer-output\SHA256.txt'
+          if (!(Test-Path 'installer-output\EmberTable-Setup-0.7.0.exe')) { throw 'Installer missing' }
+          Get-FileHash 'installer-output\EmberTable-Setup-0.7.0.exe' -Algorithm SHA256 | Format-List | Out-File 'installer-output\SHA256.txt'
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
@@ -135,4 +136,6 @@ jobs:
             reader-failure.png
             ui-monster-manual.png
             ui-player-notes.png
+            ui-template-library.png
+            template-qa/*.png
           if-no-files-found: ignore
