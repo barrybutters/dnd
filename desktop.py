@@ -67,7 +67,7 @@ def main():
             display_trace('open display returned')
             return True
     try:
-        main_window=webview.create_window('Ember Table 0.6.0',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
+        main_window=webview.create_window('Ember Table 0.6.1',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
         close_guard=CloseGuard(main_window,lambda:webview.windows)
         main_window.events.closing += close_guard.request
         webview.start(gui='edgechromium',debug=bool(qa_port),private_mode=False,storage_path=str(server.DATA/'webview'),icon=str(server.BASE/'app'/'ember-table.ico'))

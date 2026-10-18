@@ -190,7 +190,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path=urlparse(self.path).path
         try:
-            if path=='/api/dice-state':self.reply({'event':dice_service.snapshot(),'obsURL':dice_service.OBS_URL})
+            if path=='/api/dice-state':self.reply({'event':dice_service.snapshot(),'obsURL':dice_service.OBS_URL,'overlayConnected':time.time()-dice_service.LAST_POLL<4})
             elif path=='/api/workspace':self.reply(read_workspace())
             elif path=='/api/diagnostics':
                 writable=False
@@ -201,7 +201,7 @@ class Handler(SimpleHTTPRequestHandler):
                 readable=False
                 try:readable=isinstance(read_workspace(),dict)
                 except ValueError:pass
-                self.reply({'version':'0.6.0','platform':sys.platform,'python':sys.version.split()[0],
+                self.reply({'version':'0.6.1','platform':sys.platform,'python':sys.version.split()[0],
                     'workspaceReadable':readable,'writable':writable,'freeMiB':shutil.disk_usage(DATA).free//(1024*1024),
                     'backups':len(list(BACKUPS.glob('*.json'))),'books':len(list(RULES.glob('*.json')))})
             elif path=='/api/backups':self.reply([{'id':p.name,'time':p.stat().st_mtime} for p in sorted(BACKUPS.glob('*.json'),reverse=True)])

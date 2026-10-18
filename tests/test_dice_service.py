@@ -20,7 +20,9 @@ class Dice(unittest.TestCase):
   for value in [0,21,True,'20']:
    with self.assertRaises(ValueError):d.publish({'roll':{'values':[value],'sides':20,'total':20}})
  def test_queue_once(self):
-  d.command({'expr':'2d6+3','broadcast':True});self.assertEqual(d.drain(),[{'expr':'2d6+3','broadcast':True}]);self.assertEqual(d.drain(),[])
+  d.command({'expr':'2d6+3','broadcast':True});event=d.snapshot(True);self.assertIsNotNone(event);self.assertEqual(event['roll']['total'],sum(event['roll']['values'])+3);rows=d.drain();self.assertEqual(rows[0]['eventId'],event['id']);self.assertEqual(rows[0]['roll'],event['roll']);self.assertEqual(d.drain(),[])
+  for expr in ['0d20','101d6','1d0','1d1001']:
+   with self.assertRaises(ValueError):d.command({'expr':expr})
  def test_close_callback_does_not_wait_on_renderer(self):
   entered=threading.Event();release=threading.Event();called=[]
   class Window:
