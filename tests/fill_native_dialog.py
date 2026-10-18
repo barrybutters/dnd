@@ -6,7 +6,11 @@ from pywinauto.keyboard import send_keys
 path=str(Path(sys.argv[1]).resolve())
 try:
     # Win32 sees owned common dialogs even when the UIA tree nests them under WebView2.
-    dlg=Desktop(backend='win32').window(class_name='#32770',visible_only=True)
+    main=Desktop(backend='win32').window(title_re=r'^Ember Table \d',visible_only=True)
+    main.wait('visible',timeout=25)
+    process=main.process_id()
+    print('Ember Table dialog owner PID:',process,flush=True)
+    dlg=Desktop(backend='win32').window(title='Open',class_name='#32770',process=process,visible_only=True)
     dlg.wait('visible',timeout=25)
     print('Native dialog title:',dlg.window_text(),flush=True)
     field=dlg.child_window(control_id=1148,class_name='Edit',visible_only=True,enabled_only=True,found_index=0)
