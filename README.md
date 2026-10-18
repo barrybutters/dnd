@@ -1,4 +1,4 @@
-# Ember Table 0.5.0
+# Ember Table 0.6.0
 
 An offline Windows campaign companion for dungeon masters and players.
 
@@ -36,11 +36,11 @@ Private book packs may be imported from either rules shelf using Import book pac
 ## Deleting records
 Campaign settings on Overview and Campaign include Delete campaign, with an exact-name confirmation. Deleting the last campaign leaves a genuinely empty workspace. Shared rulebooks stay available. Undo works during the current session, and automatic disk backups can restore older workspace revisions. Record delete buttons cover characters, journal entries, quests, sessions, NPCs, items, encounter plans/combatants, maps/tokens, wiki pages/attachments, spells/actions/resources, audio, reference entries and rolls. Deleting a character removes linked combatants and moves its items to party inventory. Removing a container leaves its contents in inventory. Attachment removal unlinks a file; its copied asset may remain on disk. Rulebook removal is separate from campaign undo.
 
-## Book import fix in 0.5.0
+## Book import fix in 0.6.0
 The desktop book-pack button now uses the native Windows file chooser through the pywebview bridge. ZIP contents are streamed into a staging folder, checked, and installed without buffering the full pack. A persistent progress dialog shows completion or specific errors. Closing the app waits for an active import. Browser fallback uses an attached file input. Regression coverage includes the packaged EXE's actual Windows file dialog and a generated 390 MiB five-book fixture; no supplied books enter the public build runner.
 
 
-## Version 0.5.0 — offline studio and campaign preparation
+## Version 0.6.0 — offline studio and campaign preparation
 
 - Map studio: ten deterministic terrain textures, soft round brushes, size/opacity controls, thirty original canvas stamps across six categories, image stamp import, scatter, mirror, rotation, freehand paths/walls/filled shapes, labels, selection/movement and editable size/rotation/opacity. Visible layers have independent opacity, ordering and locks. Add custom layers, duplicate maps/templates, or try the starter landscape. Delete removes an entire artwork object/stroke. Maximum 5,000 artwork objects per map; battle maps remain 8–60 squares per side.
 - Map PNG export at 1×/2×/4× pixel dimensions with player fog or artwork-only options. Transparent image stamps are supported. Artwork is original procedural illustration, not Inkarnate's proprietary art collection. This is a local editor, not an Inkarnate-compatible file importer.
@@ -56,7 +56,7 @@ The desktop book-pack button now uses the native Windows file chooser through th
 Existing workspace and book-pack imports, native chooser regression, backups and delete controls remain covered by checks. Data format additions are backward compatible with 0.3.3 workspaces. Upgrading keeps data in the same local folder. Do not run two app versions against the same data directory simultaneously.
 
 
-## Version 0.5.0 — expanded map studio and table tools
+## Version 0.6.0 — expanded map studio and table tools
 
 The map catalogue contains 178 original procedural stamps (including the original 30), grouped into nature, town buildings, fortifications, dungeon furnishings, wilderness, coastal and world-feature categories. There are 22 terrain palettes. Stamp search spans categories; favourites and imported image stamps stay local. This is a growing original catalogue, not Inkarnate's proprietary asset collection or file format.
 
@@ -77,3 +77,17 @@ Folder backups use a native destination-folder chooser, atomic copies and unique
 Validation includes the original storage/engine/UI/native-import regressions, pure currency and concentration checks, PDF pagination/embedded-font tests, atomic folder-copy tests, a full Windows UI workflow for the new tools and the packaged application's PDF generator and player display. Physical TV hardware and Windows wireless casting remain user-hardware checks.
 
 Concentration DCs follow the selected character/campaign edition: the 2024 calculation caps at DC 30; the 2014 calculation remains uncapped. Reference checked against the official 2024 Basic Rules glossary: https://www.dndbeyond.com/sources/dnd/br-2024/rules-glossary#Concentration. Workspace reads and writes share a lock to prevent recovery from an older snapshot during concurrent saves. Failed unchanged snapshots can be retried from Diagnostics; the desktop close handler also waits for an unresolved save failure.
+
+### 0.6: generators, living world, streaming dice and reliable exit
+
+Use **Generators** to select a male/female/random NPC, a job (including no job or custom), and everyday/trained/veteran experience. Review and edit the name, notes, six ability scores, HP, AC, speed, skills and attack before saving. Generated statistics are original homebrew suggestions, not official stat blocks. Saved NPCs can be added to initiative. Place generation supports towns, villages, cities, taverns, forests, mountains, rivers, ruins, islands, dungeons, roads and castles. DM locations save privately to the wiki; players can save names to their journal.
+
+**World ledger** tracks events, rumours, objectives, contacts and threat clocks with campaign days, statuses and links to NPCs, wiki entries, quests and factions. DM notes and rumour truth are separate from player-facing text. Entries are private until explicitly shared. Shared updates appear in the player journal and campaign search. Player mode is a local convenience, not access control against someone with access to your computer or data files.
+
+**Dice → Open dice window** opens a separate native controller. Thrown dice tumble, bounce and slide before settling; the animation presents the same cryptographic result saved in history and never determines a second result. This is an animated presentation, not a rigid-body physics simulation. Up to 16 dice are drawn, with the complete roll recorded in history. Nonstandard dice use a generic polyhedron and the exact result label.
+
+**Dice → OBS setup** provides the current loopback-only Browser Source URL. Keep Ember Table open; in OBS select Browser Source, disable Local file, use that URL at 1280×720/60FPS and retain the default transparent CSS. The source has a transparent background, like a PNG cutout; no chroma key is needed. Broadcasting is off by default. Enable it in the controller, enable all-roll broadcasting in the main Dice page, or explicitly broadcast the last roll. Labels and totals are included. Clear overlay removes the roll immediately; rolls expire after 15 seconds. OBS uses port 17861 normally, or an available fallback if occupied. Check the displayed URL after restarting. The OBS server serves only the overlay assets and explicitly published ephemeral result, and cannot read campaign records or accept writes. It is local to the same PC; no LAN or online play is added.
+
+Closing now returns immediately from the native Windows closing callback and performs its save check on a worker thread. The app flushes the scratchpad and waits for pending saves/imports/backups. A responsive close dialog offers Keep working or an explicit exit without waiting. Save failures remain visible, with an option to keep working and retry. Closing the main window also closes its map and dice windows.
+
+The original D20/flame/quill icon is embedded in the executable and installer, and used for desktop/Start menu shortcuts. The installer selects a desktop shortcut by default. Builds include version/product information, use a normal directory bundle, require no elevation, and use no UPX, obfuscation or antivirus exclusions. The EXE and installer are currently **unsigned**: no publisher code-signing identity is available in this project. SmartScreen reputation and antivirus verdicts cannot be guaranteed by source changes. A public release should use a trusted Authenticode certificate or signing service, sign the application and installer, timestamp signatures, and submit any actual false positive to the detecting vendor with its precise detection name and file hash. Do not disable antivirus to install the app.

@@ -2,6 +2,7 @@
 import sys, threading, traceback
 from pathlib import Path
 import server
+from close_guard import CloseGuard
 
 def main():
     import webview
@@ -11,12 +12,23 @@ def main():
         webview.settings['REMOTE_DEBUGGING_PORT']=qa_port
         webview.settings['OPEN_DEVTOOLS_IN_DEBUG']=False
     http = server.ThreadingHTTPServer(('127.0.0.1', 0),server.Handler)
+    overlay=server.dice_service.start_overlay(server.BASE,0 if qa_port else 17861)
     http.app_origin = f'http://127.0.0.1:{http.server_port}'
     threading.Thread(target=http.serve_forever,daemon=True).start()
     def display_trace(message):
         if qa_port:
             with (server.DATA/'display-test-log.txt').open('a',encoding='utf-8') as log:log.write(message+'\n')
     class DesktopAPI:
+        def finish_close(self):
+            return close_guard.finish()
+        def cancel_close(self):
+            return close_guard.cancel()
+        def open_dice(self):
+            for w in webview.windows:
+                if w.title == "Ember Table · Dice":
+                    w.show(); w.restore(); return True
+            webview.create_window("Ember Table · Dice",http.app_origin+"/dice-window.html",width=900,height=650,min_size=(600,450))
+            return True
         def backup_to_folder(self):
             from backups import write_folder_backup
             try:
@@ -55,18 +67,13 @@ def main():
             display_trace('open display returned')
             return True
     try:
-        main_window=webview.create_window('Ember Table 0.5.0',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
-        def before_close():
-            try:
-                pending=main_window.evaluate_js("Boolean(window.__saving || window.__saveError || window.__scratchPending || window.__bookImporting || window.__externalBackup)")
-                if pending:
-                    main_window.evaluate_js("if(typeof save==='function') save(); if(typeof toast==='function') toast('Saving or importing. Please wait until it finishes before closing.');")
-                    return False
-            except Exception:
-                pass
-        main_window.events.closing += before_close
-        webview.start(gui='edgechromium',debug=bool(qa_port),private_mode=False,storage_path=str(server.DATA/'webview'))
+        main_window=webview.create_window('Ember Table 0.6.0',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
+        close_guard=CloseGuard(main_window,lambda:webview.windows)
+        main_window.events.closing += close_guard.request
+        webview.start(gui='edgechromium',debug=bool(qa_port),private_mode=False,storage_path=str(server.DATA/'webview'),icon=str(server.BASE/'app'/'ember-table.ico'))
     finally:
+        overlay.shutdown()
+        overlay.server_close()
         http.shutdown()
         http.server_close()
 

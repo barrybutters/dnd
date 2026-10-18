@@ -7,5 +7,5 @@ a = Analysis(['desktop.py'],pathex=['vendor'],binaries=web_bins+pdf_bins+handout
     datas=[('app','app'),('vendor/pypdf-LICENSE.txt','licenses')]+web_datas+pdf_datas+handout_datas,
     hiddenimports=web_hidden+pdf_hidden+handout_hidden,hookspath=[],hooksconfig={},runtime_hooks=[],excludes=['PyQt5','PyQt6','PySide2','PySide6'],noarchive=False)
 pyz = PYZ(a.pure)
-exe = EXE(pyz,a.scripts,[],exclude_binaries=True,name='EmberTable',debug=False,bootloader_ignore_signals=False,strip=False,upx=False,console=False)
+exe = EXE(pyz,a.scripts,[],exclude_binaries=True,name='EmberTable',debug=False,bootloader_ignore_signals=False,strip=False,upx=False,console=False,icon='app/ember-table.ico',version='version-info.txt')
 coll = COLLECT(exe,a.binaries,a.datas,strip=False,upx=False,name='EmberTable')

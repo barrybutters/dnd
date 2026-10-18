@@ -1,4 +1,5 @@
 """Offline Ember Table storage, PDF extraction, portable packages and recovery."""
+import dice_service
 import sys,json,io,re,os,threading,time,zipfile,uuid,shutil,mimetypes
 from pathlib import Path
 from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
@@ -189,7 +190,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path=urlparse(self.path).path
         try:
-            if path=='/api/workspace':self.reply(read_workspace())
+            if path=='/api/dice-state':self.reply({'event':dice_service.snapshot(),'obsURL':dice_service.OBS_URL})
+            elif path=='/api/workspace':self.reply(read_workspace())
             elif path=='/api/diagnostics':
                 writable=False
                 try:
@@ -199,7 +201,7 @@ class Handler(SimpleHTTPRequestHandler):
                 readable=False
                 try:readable=isinstance(read_workspace(),dict)
                 except ValueError:pass
-                self.reply({'version':'0.5.0','platform':sys.platform,'python':sys.version.split()[0],
+                self.reply({'version':'0.6.0','platform':sys.platform,'python':sys.version.split()[0],
                     'workspaceReadable':readable,'writable':writable,'freeMiB':shutil.disk_usage(DATA).free//(1024*1024),
                     'backups':len(list(BACKUPS.glob('*.json'))),'books':len(list(RULES.glob('*.json')))})
             elif path=='/api/backups':self.reply([{'id':p.name,'time':p.stat().st_mtime} for p in sorted(BACKUPS.glob('*.json'),reverse=True)])
@@ -264,7 +266,10 @@ class Handler(SimpleHTTPRequestHandler):
                     upload.seek(0);self.reply(import_pack(upload,DATA,LOCK))
                 return
             raw=self.rfile.read(n)
-            if path=='/api/rules':
+            if path=='/api/dice-event':self.reply(dice_service.publish(json.loads(raw)))
+            elif path=='/api/dice-command':self.reply(dice_service.command(json.loads(raw)))
+            elif path=='/api/dice-drain':self.reply(dice_service.drain())
+            elif path=='/api/rules':
                 args=parse_qs(urlparse(self.path).query)
                 self.reply(import_rulebook(raw,args.get('title',['Rulebook'])[0],args.get('edition',['2014'])[0]))
             elif path.startswith('/api/import-status/'):

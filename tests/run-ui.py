@@ -24,5 +24,6 @@ try:
  result=subprocess.call(['node','tests/ui-smoke.cjs',http.app_origin],cwd=server.BASE)
  if result==0:result=subprocess.call(['node','tests/expansion.cjs',http.app_origin],cwd=server.BASE)
  if result==0:result=subprocess.call(['node','tests/v05.cjs',http.app_origin],cwd=server.BASE)
+ if result==0:result=subprocess.call(['node','tests/v06.cjs',http.app_origin],cwd=server.BASE)
  sys.exit(result)
 finally:http.shutdown();http.server_close();fixture.unlink(missing_ok=True);pack.unlink(missing_ok=True)

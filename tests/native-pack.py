@@ -15,7 +15,12 @@ with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile:
             time.sleep(.5)
         else:raise RuntimeError('The WebView2 test connection did not open')
         code=subprocess.run(['node','tests/native-pack.cjs',str(port),'tests/large pack fixture.zip'],timeout=180).returncode
-        if code:raise RuntimeError('Native book import regression test failed')
+        if code:raise RuntimeError('Native desktop regression test failed')
+        app.wait(timeout=15)
+        import json
+        saved=json.loads((Path(profile)/'EmberTable'/'workspace.json').read_text(encoding='utf-8'))
+        assert saved['campaigns'][0]['scratchpad']=='Saved immediately before native close'
+        print('PASS: native process exited without forced termination and final scratchpad persisted',flush=True)
     finally:
         for name in ['book-import-log.txt','display-test-log.txt','startup-error.txt']:
             log=Path(profile)/'EmberTable'/name
