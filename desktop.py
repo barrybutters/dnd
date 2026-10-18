@@ -19,6 +19,18 @@ def main():
         if qa_port:
             with (server.DATA/'display-test-log.txt').open('a',encoding='utf-8') as log:log.write(message+'\n')
     class DesktopAPI:
+        def open_rulebook(self, book_id):
+            try:
+                import json,re,os
+                if not re.fullmatch(r'[a-f0-9]{32}',str(book_id)):raise ValueError('Invalid book')
+                book=server.validate_book(json.loads((server.RULES/(book_id+'.json')).read_text(encoding='utf-8')))
+                name=str(book.get('url',''))[8:]
+                if not re.fullmatch(r'[a-f0-9]{32}\.pdf',name):raise ValueError('Invalid PDF reference')
+                path=server.ASSETS/name
+                if not path.is_file():raise ValueError('The PDF is missing. Use Replace selected PDF to reconnect it.')
+                os.startfile(str(path))
+                return {'ok':True}
+            except Exception as e:return {'error':str(e)}
         def finish_close(self):
             return close_guard.finish()
         def cancel_close(self):
@@ -67,7 +79,7 @@ def main():
             display_trace('open display returned')
             return True
     try:
-        main_window=webview.create_window('Ember Table 0.6.1',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
+        main_window=webview.create_window('Ember Table 0.6.2',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
         close_guard=CloseGuard(main_window,lambda:webview.windows)
         main_window.events.closing += close_guard.request
         webview.start(gui='edgechromium',debug=bool(qa_port),private_mode=False,storage_path=str(server.DATA/'webview'),icon=str(server.BASE/'app'/'ember-table.ico'))

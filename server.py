@@ -133,19 +133,22 @@ def validate_book(book):
     return book
 
 def book_summary(book):
-    return {k:book[k] for k in ['id','title','edition','url','pageCount','searchablePages']}
+    summary={k:book[k] for k in ['id','title','edition','url','pageCount','searchablePages']}
+    summary['fileAvailable']=bool(ASSET_RE.fullmatch(str(book.get('url',''))[8:])) and (ASSETS/str(book.get('url',''))[8:]).is_file()
+    return summary
 
-def import_rulebook(raw,title,edition):
+def import_rulebook(raw,title,edition,replace_id=None):
     if edition not in ['2014','2024']:raise ValueError('Choose a rules edition.')
     if len(raw)>200*1024*1024:raise ValueError('Rulebook PDFs must be under 200 MB.')
+    if replace_id is not None and (not re.fullmatch(r'[a-f0-9]{32}',replace_id) or not (RULES/(replace_id+'.json')).is_file()):raise ValueError('The original book is no longer on the shelf.')
     reader=PdfReader(io.BytesIO(raw))
-    if reader.is_encrypted:raise ValueError('Use an unlocked PDF.')
+    if reader.is_encrypted and not reader.decrypt(''):raise ValueError('This PDF requires a password. Import an unlocked copy.')
     if not 1<=len(reader.pages)<=2000:raise ValueError('Use a PDF with 1 to 2000 pages.')
     pages=[]
     for page in reader.pages:
         try:pages.append((page.extract_text() or '')[:100000])
         except Exception:pages.append('')
-    bid=uuid.uuid4().hex;asset_name=uuid.uuid4().hex+'.pdf'
+    bid=replace_id or uuid.uuid4().hex;asset_name=uuid.uuid4().hex+'.pdf'
     book={'id':bid,'title':str(title or 'Rulebook')[:200],'edition':edition,'url':'/assets/'+asset_name,'pageCount':len(pages),'searchablePages':sum(bool(p.strip()) for p in pages),'pages':pages}
     with LOCK:
         (ASSETS/asset_name).write_bytes(raw)
@@ -201,7 +204,7 @@ class Handler(SimpleHTTPRequestHandler):
                 readable=False
                 try:readable=isinstance(read_workspace(),dict)
                 except ValueError:pass
-                self.reply({'version':'0.6.1','platform':sys.platform,'python':sys.version.split()[0],
+                self.reply({'version':'0.6.2','platform':sys.platform,'python':sys.version.split()[0],
                     'workspaceReadable':readable,'writable':writable,'freeMiB':shutil.disk_usage(DATA).free//(1024*1024),
                     'backups':len(list(BACKUPS.glob('*.json'))),'books':len(list(RULES.glob('*.json')))})
             elif path=='/api/backups':self.reply([{'id':p.name,'time':p.stat().st_mtime} for p in sorted(BACKUPS.glob('*.json'),reverse=True)])
@@ -271,7 +274,7 @@ class Handler(SimpleHTTPRequestHandler):
             elif path=='/api/dice-drain':self.reply(dice_service.drain())
             elif path=='/api/rules':
                 args=parse_qs(urlparse(self.path).query)
-                self.reply(import_rulebook(raw,args.get('title',['Rulebook'])[0],args.get('edition',['2014'])[0]))
+                self.reply(import_rulebook(raw,args.get('title',['Rulebook'])[0],args.get('edition',['2014'])[0],args.get('replace',[None])[0]))
             elif path.startswith('/api/import-status/'):
                 job_id=path.rsplit('/',1)[-1]
                 with IMPORT_JOB_LOCK:job=dict(IMPORT_JOBS.get(job_id,{}))

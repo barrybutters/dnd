@@ -20,10 +20,13 @@ with zipfile.ZipFile(pack,'w') as z:
  z.writestr('assets/'+asset,fixture.read_bytes());z.writestr('rulebooks/'+bid+'.json',json.dumps(book))
 http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler);http.app_origin=f'http://127.0.0.1:{http.server_port}'
 threading.Thread(target=http.serve_forever,daemon=True).start()
+from prepare_manual_fixture import prepare
+manual=server.BASE/'tests'/'manual-fixture.pdf';prepare(manual)
 try:
  result=subprocess.call(['node','tests/ui-smoke.cjs',http.app_origin],cwd=server.BASE)
  if result==0:result=subprocess.call(['node','tests/expansion.cjs',http.app_origin],cwd=server.BASE)
  if result==0:result=subprocess.call(['node','tests/v05.cjs',http.app_origin],cwd=server.BASE)
  if result==0:result=subprocess.call(['node','tests/v06.cjs',http.app_origin],cwd=server.BASE)
+ if result==0:result=subprocess.call(['node','tests/v062.cjs',http.app_origin],cwd=server.BASE)
  sys.exit(result)
-finally:http.shutdown();http.server_close();fixture.unlink(missing_ok=True);pack.unlink(missing_ok=True)
+finally:http.shutdown();http.server_close();fixture.unlink(missing_ok=True);pack.unlink(missing_ok=True);manual.unlink(missing_ok=True)

@@ -1,4 +1,4 @@
-# Ember Table 0.6.0
+# Ember Table 0.6.2
 
 An offline Windows campaign companion for dungeon masters and players.
 
@@ -97,3 +97,10 @@ The original D20/flame/quill icon is embedded in the executable and installer, a
 The Monsters tab is back near Encounters in DM navigation; existing Bestiary links and saved monster records still work. The dice controller now generates and publishes a single cryptographic roll through the local server immediately, then synchronizes that same result into main-window history. This removes its dependence on main-window timers while minimized. OBS setup includes a connection indicator, preview and explicit Send OBS test roll button; broadcasting of ordinary private rolls remains opt-in. The overlay reconnects after a temporary interruption. If no source connects, paste the current OBS setup URL into the Browser Source with Local file off and make the source visible.
 
 The installer repairs the desktop/Start menu shortcuts using an explicit versioned ICO file at the installation root, avoiding stale EXE icon-cache references. The Windows install test verifies the shortcut target and icon file and launches the app through the desktop shortcut. Native OBS regression pauses main-window roll processing before rolling in the pop-out, verifies the external transparent source receives the result, then resumes history synchronization.
+
+
+### 0.6.2: Monster Manual reader and persistent Notes
+
+Monsters now embeds the selected local manual directly, with page navigation, zoom, saved reading position, direct PDF import and a default-PDF-app fallback. Search results can open a page as well as draft a stat block. Missing PDF assets are reported explicitly; Replace selected PDF preserves the book identity, bookmarks and saved monster references. Image-only PDFs can be read without searchable text. PDFs encrypted with a blank opening password are accepted; files requiring a password still need an unlocked copy.
+
+Notes is a dedicated tab in both roles, separate from shared party clues and the DM journal. Choose a named notebook or character, save notes with session labels, reopen/edit them in later sessions, pin, search, export or delete with undo. Player mode excludes DM notebook entries. Notebooks are local organization, not authentication or encryption against someone with access to the computer/data files. Notes are included in normal workspace saves, backups and exports.
