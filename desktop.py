@@ -13,6 +13,9 @@ def main():
     http = server.ThreadingHTTPServer(('127.0.0.1', 0),server.Handler)
     http.app_origin = f'http://127.0.0.1:{http.server_port}'
     threading.Thread(target=http.serve_forever,daemon=True).start()
+    def display_trace(message):
+        if qa_port:
+            with (server.DATA/'display-test-log.txt').open('a',encoding='utf-8') as log:log.write(message+'\n')
     class DesktopAPI:
         def choose_rulepack(self):
             def trace(message):
@@ -27,15 +30,22 @@ def main():
                 trace('Chooser error: '+str(e))
                 return {'error':str(e)}
         def display_screens(self):
-            return [{'width':s.width,'height':s.height} for s in webview.screens]
+            display_trace('screens requested')
+            result=[{'width':int(s.width),'height':int(s.height)} for s in webview.screens]
+            display_trace('screens returned '+str(len(result)))
+            return result
         def open_display(self, screen_index=0, fullscreen=False):
+            display_trace('open display requested')
             screens=webview.screens
             index=max(0,min(int(screen_index),len(screens)-1))
             class DisplayAPI:
                 def fullscreen(self):
+                    display_trace('fullscreen requested')
                     display.toggle_fullscreen()
+                    display_trace('fullscreen returned')
                     return True
             display=webview.create_window('Ember Table · Player Display',http.app_origin+'/display.html',width=1200,height=850,screen=screens[index] if screens else None,fullscreen=bool(fullscreen),js_api=DisplayAPI())
+            display_trace('open display returned')
             return True
     try:
         main_window=webview.create_window('Ember Table 0.4.0',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
