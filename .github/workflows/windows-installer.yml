@@ -119,4 +119,6 @@ jobs:
             ui-map-pro.png
             native-import-qa.png
             ui-generators.png
+            ui-dice-obs.png
+            reader-failure.png
           if-no-files-found: ignore

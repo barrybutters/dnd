@@ -7,6 +7,7 @@ window.prepareDesktopClose=async function(){
  $('#cancelExit').onclick=()=>{dialog.close();cancel()};
  $('#forceExit').onclick=()=>{if(confirm('Exit now? Any unsaved changes or unfinished imports may be lost.'))api.finish_close()};
  dialog.addEventListener('cancel',cancel,{once:true});
+ if(document.querySelector('#modal')?.open){$('#closeStatus').textContent='A form is still open. Keep working to save it, or exit without saving the unfinished form.';return}
  clearTimeout(scratchTimer);window.__scratchPending=false;
  if(!window.__loadFailed)save();
  const start=Date.now();
