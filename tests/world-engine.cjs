@@ -1,0 +1,3 @@
+const assert=require('node:assert/strict'),W=require('../app/world-engine.js');let n=0;const rng=s=>++n%s+1;
+for(const gender of ['Male','Female'])for(const job of W.jobs)for(const tier of ['Everyday','Trained','Veteran']){const x=W.npc({gender,job,tier},rng);assert.equal(x.gender,gender);assert.equal(x.job,job);assert.ok(x.title.includes(' '));assert.ok(x.hp>0&&x.ac>=10&&x.ac<=18);for(const v of Object.values(x.abilities))assert.ok(v>=8&&v<=18);assert.equal(x.hp,x.maxHp)}
+for(const k of W.kinds){const x=W.place(k,rng);assert.equal(x.kind,k);assert.ok(x.title.length>4&&x.body.length>20)}assert.equal(W.npc({gender:'Male',job:'Custom cartographer'},()=>1).job,'Custom cartographer');console.log('PASS: NPC options, stats and all place categories');

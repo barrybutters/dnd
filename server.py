@@ -1,4 +1,5 @@
 """Offline Ember Table storage, PDF extraction, portable packages and recovery."""
+import dice_service
 import sys,json,io,re,os,threading,time,zipfile,uuid,shutil,mimetypes
 from pathlib import Path
 from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
@@ -6,6 +7,7 @@ from urllib.parse import urlparse,parse_qs
 BASE=Path(__file__).resolve().parent
 sys.path.insert(0,str(BASE/'vendor'))
 from pypdf import PdfReader
+from handouts import render_handout
 DATA=Path(os.environ.get('EMBER_TABLE_DATA') or (Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'EmberTable'))
 DATA.mkdir(parents=True,exist_ok=True)
 ASSETS=DATA/'assets';ASSETS.mkdir(exist_ok=True)
@@ -15,23 +17,30 @@ LOCK=threading.RLock()
 ASSET_RE=re.compile(r'^[a-f0-9]{32}\.(png|jpg|jpeg|webp|gif|mp3|wav|ogg|m4a|pdf)$')
 
 def validate(data):
-    if not isinstance(data,dict) or not isinstance(data.get('campaigns'),list) or not data['campaigns'] or len(data['campaigns'])>200:raise ValueError('Invalid workspace')
+    if not isinstance(data,dict) or not isinstance(data.get('campaigns'),list) or len(data['campaigns'])>200:raise ValueError('Invalid workspace')
     for c in data['campaigns']:
         if not isinstance(c,dict) or not isinstance(c.get('name'),str):raise ValueError('Invalid campaign')
     return data
 
 def read_workspace():
-    path=DATA/'workspace.json'
-    if not path.exists():return None
-    try:return validate(json.loads(path.read_text(encoding='utf-8')))
-    except (ValueError,OSError):
-        for p in sorted(BACKUPS.glob('*.json'),reverse=True):
-            try:
-                data=validate(json.loads(p.read_text(encoding='utf-8')))
-                data['_recovery']='Recovered from automatic backup '+p.name
-                return data
-            except (ValueError,OSError):continue
-        raise ValueError('The saved workspace is damaged. Restore an exported backup. The damaged file has been preserved.')
+    with LOCK:
+        path=DATA/'workspace.json'
+        if not path.exists():return None
+        try:
+            for attempt in range(5):
+                try:raw=path.read_text(encoding='utf-8');break
+                except PermissionError:
+                    if attempt==4:raise
+                    time.sleep(.05*(attempt+1))
+            return validate(json.loads(raw))
+        except ValueError:
+            for p in sorted(BACKUPS.glob('*.json'),reverse=True):
+                try:
+                    data=validate(json.loads(p.read_text(encoding='utf-8')))
+                    data['_recovery']='Recovered from automatic backup '+p.name
+                    return data
+                except (ValueError,OSError):continue
+            raise ValueError('The saved workspace is damaged. Restore an exported backup. The damaged file has been preserved.')
 
 def write_workspace(data):
     validate(data)
@@ -45,7 +54,11 @@ def write_workspace(data):
         raw=json.dumps(data,ensure_ascii=False).encode('utf-8')
         tmp=DATA/'workspace.tmp'
         with tmp.open('wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-        os.replace(tmp,current)
+        for attempt in range(5):
+            try:os.replace(tmp,current);break
+            except PermissionError:
+                if attempt==4:raise
+                time.sleep(.05*(attempt+1))
         for p in sorted(BACKUPS.glob('*.json'),reverse=True)[30:]:p.unlink()
 
 def parse_pdf(raw):
@@ -94,7 +107,7 @@ def export_package():
 def import_package(raw):
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         infos=z.infolist()
-        if len(infos)>2000 or sum(i.file_size for i in infos)>500*1024*1024:raise ValueError('Package too large (500 MB expanded maximum).')
+        if len(infos)>2000 or sum(i.file_size for i in infos)>1024*1024*1024:raise ValueError('Package too large (1 GB expanded maximum).')
         if 'workspace.json' not in z.namelist():raise ValueError('Missing workspace.json')
         data=validate(json.loads(z.read('workspace.json')))
         assets={};books={}
@@ -120,19 +133,22 @@ def validate_book(book):
     return book
 
 def book_summary(book):
-    return {k:book[k] for k in ['id','title','edition','url','pageCount','searchablePages']}
+    summary={k:book[k] for k in ['id','title','edition','url','pageCount','searchablePages']}
+    summary['fileAvailable']=bool(ASSET_RE.fullmatch(str(book.get('url',''))[8:])) and (ASSETS/str(book.get('url',''))[8:]).is_file()
+    return summary
 
-def import_rulebook(raw,title,edition):
+def import_rulebook(raw,title,edition,replace_id=None):
     if edition not in ['2014','2024']:raise ValueError('Choose a rules edition.')
     if len(raw)>200*1024*1024:raise ValueError('Rulebook PDFs must be under 200 MB.')
+    if replace_id is not None and (not re.fullmatch(r'[a-f0-9]{32}',replace_id) or not (RULES/(replace_id+'.json')).is_file()):raise ValueError('The original book is no longer on the shelf.')
     reader=PdfReader(io.BytesIO(raw))
-    if reader.is_encrypted:raise ValueError('Use an unlocked PDF.')
+    if reader.is_encrypted and not reader.decrypt(''):raise ValueError('This PDF requires a password. Import an unlocked copy.')
     if not 1<=len(reader.pages)<=2000:raise ValueError('Use a PDF with 1 to 2000 pages.')
     pages=[]
     for page in reader.pages:
         try:pages.append((page.extract_text() or '')[:100000])
         except Exception:pages.append('')
-    bid=uuid.uuid4().hex;asset_name=uuid.uuid4().hex+'.pdf'
+    bid=replace_id or uuid.uuid4().hex;asset_name=uuid.uuid4().hex+'.pdf'
     book={'id':bid,'title':str(title or 'Rulebook')[:200],'edition':edition,'url':'/assets/'+asset_name,'pageCount':len(pages),'searchablePages':sum(bool(p.strip()) for p in pages),'pages':pages}
     with LOCK:
         (ASSETS/asset_name).write_bytes(raw)
@@ -141,33 +157,27 @@ def import_rulebook(raw,title,edition):
 
 
 def import_rulepack(raw):
-    with zipfile.ZipFile(io.BytesIO(raw)) as z:
-        infos=z.infolist()
-        if len(infos)>1000 or sum(i.file_size for i in infos)>1024*1024*1024:raise ValueError('Book pack is too large (1 GB expanded maximum).')
-        manifest=json.loads(z.read('ember-rulepack.json'))
-        if manifest.get('format')!='ember-rulepack' or manifest.get('version')!=1:raise ValueError('Unsupported book pack')
-        assets={};books={}
-        for info in infos:
-            name=info.filename
-            if name=='ember-rulepack.json':continue
-            if name.startswith('assets/') and ASSET_RE.fullmatch(name[7:]) and name.endswith('.pdf'):assets[name[7:]]=z.read(info)
-            elif name.startswith('rulebooks/') and re.fullmatch(r'[a-f0-9]{32}\.json',name[10:]):
-                b=validate_book(json.loads(z.read(info)))
-                if b['id']+'.json'!=name[10:]:raise ValueError('Book ID does not match its index')
-                books[name[10:]]=b
-            else:raise ValueError('Invalid book pack path')
-        if not books:raise ValueError('This pack contains no books')
-        for b in books.values():
-            if not re.fullmatch(r'/assets/[a-f0-9]{32}\.pdf',b.get('url','')) or b['url'][8:] not in assets:raise ValueError('Missing book PDF')
-        with LOCK:
-            for name,content in assets.items():
-                p=ASSETS/name
-                if p.exists() and p.read_bytes()!=content:raise ValueError('Asset conflict; source file has changed')
-            for name,content in assets.items():
-                if not (ASSETS/name).exists():(ASSETS/name).write_bytes(content)
-            for name,b in books.items():
-                tmp=RULES/(name+'.tmp');tmp.write_text(json.dumps(b,ensure_ascii=False),encoding='utf-8');os.replace(tmp,RULES/name)
-        return {'imported':len(books),'books':[book_summary(b) for b in books.values()]}
+    from book_import import import_pack
+    return import_pack(io.BytesIO(raw),DATA,LOCK)
+
+IMPORT_JOBS={}
+IMPORT_JOB_LOCK=threading.Lock()
+def start_book_import(path):
+    from book_import import import_pack
+    job_id=uuid.uuid4().hex
+    with IMPORT_JOB_LOCK:
+        if any(j.get('status')=='running' for j in IMPORT_JOBS.values()):raise ValueError('A book import is already running. Wait for it to finish.')
+        IMPORT_JOBS[job_id]={'status':'running','phase':'Starting','percent':0,'message':'Opening book pack','booksDone':0,'booksTotal':0}
+    def progress(**kw):
+        with IMPORT_JOB_LOCK:IMPORT_JOBS[job_id].update(kw)
+    def work():
+        try:
+            result=import_pack(path,DATA,LOCK,progress)
+            with IMPORT_JOB_LOCK:IMPORT_JOBS[job_id].update(status='complete',result=result)
+        except Exception as e:
+            with IMPORT_JOB_LOCK:IMPORT_JOBS[job_id].update(status='error',error=str(e),message=str(e))
+    threading.Thread(target=work,daemon=True).start()
+    return {'job_id':job_id}
 
 class Handler(SimpleHTTPRequestHandler):
     def guess_type(self,path):
@@ -183,9 +193,27 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path=urlparse(self.path).path
         try:
-            if path=='/api/workspace':self.reply(read_workspace())
+            if path=='/api/dice-state':self.reply({'event':dice_service.snapshot(),'obsURL':dice_service.OBS_URL,'overlayConnected':time.time()-dice_service.LAST_POLL<4})
+            elif path=='/api/workspace':self.reply(read_workspace())
+            elif path=='/api/diagnostics':
+                writable=False
+                try:
+                    probe=DATA/('health-'+uuid.uuid4().hex+'.tmp')
+                    probe.write_text('ok');probe.unlink();writable=True
+                except OSError:pass
+                readable=False
+                try:readable=isinstance(read_workspace(),dict)
+                except ValueError:pass
+                self.reply({'version':'0.7.0','platform':sys.platform,'python':sys.version.split()[0],
+                    'workspaceReadable':readable,'writable':writable,'freeMiB':shutil.disk_usage(DATA).free//(1024*1024),
+                    'backups':len(list(BACKUPS.glob('*.json'))),'books':len(list(RULES.glob('*.json')))})
             elif path=='/api/backups':self.reply([{'id':p.name,'time':p.stat().st_mtime} for p in sorted(BACKUPS.glob('*.json'),reverse=True)])
             elif path=='/api/export':self.send_bytes(export_package(),'application/zip','Ember-Table-Campaigns.zip')
+            elif path.startswith('/api/import-status/'):
+                job_id=path.rsplit('/',1)[-1]
+                with IMPORT_JOB_LOCK:job=dict(IMPORT_JOBS.get(job_id,{}))
+                if not job:self.reply({'error':'Import job not found'},404)
+                else:self.reply(job)
             elif path=='/api/rules':
                 books=[]
                 for p in RULES.glob('*.json'):
@@ -196,7 +224,11 @@ class Handler(SimpleHTTPRequestHandler):
                 bid=path.rsplit('/',1)[-1]
                 if not re.fullmatch(r'[a-f0-9]{32}',bid):raise ValueError('Invalid book')
                 book=validate_book(json.loads((RULES/(bid+'.json')).read_text(encoding='utf-8')))
-                q=parse_qs(urlparse(self.path).query).get('q',[''])[0].strip()[:200]
+                params=parse_qs(urlparse(self.path).query)
+                if 'page' in params:
+                    n=max(1,min(len(book['pages']),int(params['page'][0])))
+                    self.reply({'book':book_summary(book),'page':n,'text':book['pages'][n-1]});return
+                q=params.get('q',[''])[0].strip()[:200]
                 matches=[]
                 if q:
                     for i,text in enumerate(book['pages']):
@@ -207,13 +239,14 @@ class Handler(SimpleHTTPRequestHandler):
                 s=read_workspace() or {};c=next((c for c in s.get('campaigns',[]) if c.get('id')==s.get('selected')),{});m=next((m for m in c.get('maps',[]) if m.get('id')==c.get('activeMap')),None)
                 if m:
                     # This display omits DM records and hidden tokens.
-                    m=dict(m);m['tokens']=[t for t in m.get('tokens',[]) if not t.get('hidden')];m.pop('notes',None)
+                    m=dict(m);m['pins']=[p for p in m.get('pins',[]) if not p.get('secret',True)];m['tokens']=[t for t in m.get('tokens',[]) if not t.get('hidden')];m.pop('notes',None)
                 self.reply({'name':c.get('name','Ember Table'),'map':m,'round':c.get('round',1)})
             elif path.startswith('/assets/') and ASSET_RE.fullmatch(path[8:]):
                 p=ASSETS/path[8:]
                 if not p.exists():self.reply({'error':'Asset missing'},404)
                 else:self.send_bytes(p.read_bytes(),mimetypes.guess_type(p.name)[0] or 'application/octet-stream')
             else:super().do_GET()
+        except (BrokenPipeError,ConnectionAbortedError,ConnectionResetError):pass
         except Exception as e:self.reply({'error':str(e)},500)
     def do_POST(self):
         if self.headers.get('Origin')!=self.server.app_origin or self.headers.get('Host')!=self.server.app_origin.removeprefix('http://'):
@@ -221,17 +254,38 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             n=int(self.headers.get('Content-Length','0'))
             route=urlparse(self.path).path
-            limit=600 if route=='/api/rules/pack' else 250 if route in ['/api/import','/api/rules'] else 100
+            limit=600 if route=='/api/rules/pack' else 600 if route=='/api/import' else 250 if route=='/api/rules' else 100
             if n<1 or n>limit*1024*1024:raise ValueError('Request exceeds the size limit.')
-            raw=self.rfile.read(n);path=urlparse(self.path).path
-            if path=='/api/rules/pack':self.reply(import_rulepack(raw))
+            path=urlparse(self.path).path
+            if path=='/api/rules/pack':
+                import tempfile
+                from book_import import import_pack
+                with tempfile.TemporaryFile() as upload:
+                    remaining=n
+                    while remaining:
+                        block=self.rfile.read(min(1024*1024,remaining))
+                        if not block:raise ValueError('The file upload ended early. Try again.')
+                        upload.write(block);remaining-=len(block)
+                    upload.seek(0);self.reply(import_pack(upload,DATA,LOCK))
+                return
+            raw=self.rfile.read(n)
+            if path=='/api/dice-event':self.reply(dice_service.publish(json.loads(raw)))
+            elif path=='/api/dice-command':self.reply(dice_service.command(json.loads(raw)))
+            elif path=='/api/dice-drain':self.reply(dice_service.drain())
             elif path=='/api/rules':
                 args=parse_qs(urlparse(self.path).query)
-                self.reply(import_rulebook(raw,args.get('title',['Rulebook'])[0],args.get('edition',['2014'])[0]))
+                self.reply(import_rulebook(raw,args.get('title',['Rulebook'])[0],args.get('edition',['2014'])[0],args.get('replace',[None])[0]))
+            elif path.startswith('/api/import-status/'):
+                job_id=path.rsplit('/',1)[-1]
+                with IMPORT_JOB_LOCK:job=dict(IMPORT_JOBS.get(job_id,{}))
+                if not job:self.reply({'error':'Import job not found'},404)
+                else:self.reply(job)
             elif path=='/api/rules/remove':
                 bid=json.loads(raw).get('id','')
                 if not re.fullmatch(r'[a-f0-9]{32}',bid):raise ValueError('Invalid book')
                 (RULES/(bid+'.json')).unlink(missing_ok=True);self.reply({'removed':True})
+            elif path=='/api/handout':
+                spec=json.loads(raw);self.send_bytes(render_handout(spec.get('title',''),spec.get('text',''),spec.get('layout','document')),'application/pdf','Ember-Handout.pdf')
             elif path=='/api/pdf':self.reply(parse_pdf(raw))
             elif path=='/api/workspace':write_workspace(json.loads(raw));self.reply({'saved':True})
             elif path=='/api/import':self.reply(import_package(raw))

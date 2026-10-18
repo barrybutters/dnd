@@ -2,7 +2,7 @@ name: Build Windows installer
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feature/campaign-delete-controls]
 permissions:
   contents: read
 jobs:
@@ -16,13 +16,20 @@ jobs:
           python-version: '3.12'
           architecture: x64
       - name: Install build dependencies
-        run: python -m pip install pyinstaller pywebview pypdf
+        run: python -m pip install pyinstaller pywebview pypdf pywinauto reportlab
       - name: Check source syntax
-        run: python -m py_compile desktop.py server.py
+        run: python -m py_compile desktop.py server.py handouts.py
       - name: Test storage and engine
         run: |
           python tests/test_storage.py
+          python tests/test_handouts.py
+          python tests/test_backups.py
           node tests/engine.cjs
+          node tests/table-engine.cjs
+          node tests/world-engine.cjs
+          node tests/templates.cjs
+          python tests/test_dice_service.py
+          python tests/test_manual.py
       - name: Test desktop interface in Edge
         run: |
           npm install --no-save playwright pdfjs-dist
@@ -42,22 +49,52 @@ jobs:
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Scan build with Microsoft Defender when available
+        shell: pwsh
+        run: |
+          $status = Get-MpComputerStatus -ErrorAction SilentlyContinue
+          if ($status -and $status.AntivirusEnabled -and $status.AMServiceEnabled) {
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path 'dist/EmberTable')
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path 'installer-output')
+            $hits = Get-MpThreatDetection | Where-Object { ($_.Resources -join ' ') -match 'EmberTable' }
+            if ($hits) { $hits | Format-List; throw 'Defender reported a build detection' }
+            Write-Output 'Defender custom scan completed without a reported EmberTable detection'
+          } else {
+            Write-Output 'Defender unavailable on this hosted runner; antivirus acceptance remains unverified'
+          }
       - name: Test install and desktop startup
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'EmberTableInstalled'
-          $setup = Start-Process 'installer-output\EmberTable-Setup-0.3.1.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
+          $setup = Start-Process 'installer-output\EmberTable-Setup-0.7.0.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           $exe = Join-Path $target 'EmberTable.exe'
           if (!(Test-Path $exe)) { throw 'Installed executable missing' }
           $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'EmberTableSmokeProfile'
-          $app = Start-Process $exe -PassThru
+          $shortcutPath = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Ember Table.lnk'
+          if (!(Test-Path $shortcutPath)) { throw 'Desktop shortcut missing' }
+          $shell = New-Object -ComObject WScript.Shell
+          $link = $shell.CreateShortcut($shortcutPath)
+          if ($link.TargetPath -ne $exe) { throw 'Desktop shortcut targets the wrong executable' }
+          $icon = ($link.IconLocation -split ',')[0]
+          if (!(Test-Path $icon) -or $icon -notmatch 'ember-table-0.7.0.ico$') { throw 'Shortcut icon path is broken' }
+          $icoBytes = [IO.File]::ReadAllBytes($icon)
+          if ($icoBytes[2] -ne 1 -or $icoBytes.Length -lt 1024) { throw 'Shortcut icon is invalid' }
+          $shell.Run('"' + $shortcutPath + '"',1,$false) | Out-Null
           Start-Sleep -Seconds 15
+          $app = Get-Process EmberTable | Where-Object Path -eq $exe | Select-Object -First 1
+          if (!$app) { throw 'App did not launch through desktop shortcut' }
           if ($app.HasExited) { throw "Desktop app exited unexpectedly: $($app.ExitCode)" }
           $connections = Get-NetTCPConnection -OwningProcess $app.Id -State Listen -ErrorAction SilentlyContinue
-          $local = $connections | Where-Object LocalAddress -eq '127.0.0.1' | Select-Object -First 1
-          if (!$local) { Stop-Process -Id $app.Id -Force; throw 'Desktop local server did not start' }
-          $origin = "http://127.0.0.1:$($local.LocalPort)"
+          $origin = $null
+          foreach ($local in ($connections | Where-Object LocalAddress -eq '127.0.0.1')) {
+            $candidate = "http://127.0.0.1:$($local.LocalPort)"
+            try {
+              $health = Invoke-RestMethod "$candidate/api/diagnostics" -TimeoutSec 3
+              if ($health.version -eq '0.7.0') { $origin = $candidate; break }
+            } catch { }
+          }
+          if (!$origin) { Stop-Process -Id $app.Id -Force; throw 'Desktop local server did not start' }
           $page = Invoke-WebRequest $origin -UseBasicParsing
           if ($page.Content -notmatch 'Ember Table') { throw 'App page missing' }
           $data = @{ campaigns = @(@{ name = 'Installer smoke test' }) } | ConvertTo-Json -Depth 5
@@ -69,11 +106,15 @@ jobs:
           $uninstall = Start-Process (Join-Path $target 'unins000.exe') -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
           if ($uninstall.ExitCode -ne 0) { throw 'Uninstall failed' }
           if (!(Test-Path (Join-Path $env:LOCALAPPDATA 'EmberTable\workspace.json'))) { throw 'Uninstall deleted campaign data' }
+      - name: Verify native Windows book chooser and large pack import
+        run: |
+          python tests/make_large_rulepack.py
+          python tests/native-pack.py "dist/EmberTable/EmberTable.exe"
       - name: Verify installer exists
         shell: pwsh
         run: |
-          if (!(Test-Path 'installer-output\EmberTable-Setup-0.3.1.exe')) { throw 'Installer missing' }
-          Get-FileHash 'installer-output\EmberTable-Setup-0.3.1.exe' -Algorithm SHA256 | Format-List | Out-File 'installer-output\SHA256.txt'
+          if (!(Test-Path 'installer-output\EmberTable-Setup-0.7.0.exe')) { throw 'Installer missing' }
+          Get-FileHash 'installer-output\EmberTable-Setup-0.7.0.exe' -Algorithm SHA256 | Format-List | Out-File 'installer-output\SHA256.txt'
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
@@ -85,5 +126,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: EmberTable-UI-QA
-          path: ui-workspace.png
+          path: |
+            ui-workspace.png
+            ui-map-studio.png
+            ui-map-pro.png
+            native-import-qa.png
+            ui-generators.png
+            ui-dice-obs.png
+            reader-failure.png
+            ui-monster-manual.png
+            ui-player-notes.png
+            ui-template-library.png
+            template-qa/*.png
           if-no-files-found: ignore

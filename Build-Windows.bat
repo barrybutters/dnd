@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 py -3 -m venv .build-env
 if errorlevel 1 goto fail
-.build-env\Scripts\python.exe -m pip install pyinstaller pywebview pypdf
+.build-env\Scripts\python.exe -m pip install pyinstaller pywebview pypdf reportlab
 if errorlevel 1 goto fail
 call npm install --no-save pdfjs-dist
 if errorlevel 1 goto fail
@@ -20,7 +20,7 @@ if not exist "%EMBER_ISCC%" (
 )
 "%EMBER_ISCC%" installer.iss
 if errorlevel 1 goto fail
-echo Installer created: installer-output\EmberTable-Setup-0.3.1.exe
+echo Installer created: installer-output\EmberTable-Setup-0.3.3.exe
 pause
 exit /b 0
 :fail

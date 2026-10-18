@@ -68,6 +68,10 @@ class Storage(unittest.TestCase):
         self.assertEqual(server.import_rulepack(raw.getvalue())['imported'],1)
         self.assertEqual((server.ASSETS/asset).read_bytes(),b'%PDF-test')
 
+    def test_07_empty_workspace_persists(self):
+        server.write_workspace({'campaigns':[]})
+        self.assertEqual(server.read_workspace()['campaigns'],[])
+
     def test_04_local_api(self):
         http=server.ThreadingHTTPServer(('127.0.0.1',0),server.Handler);http.app_origin=f'http://127.0.0.1:{http.server_port}'
         threading.Thread(target=http.serve_forever,daemon=True).start()
@@ -79,5 +83,21 @@ class Storage(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as caught:urllib.request.urlopen(req)
             self.assertEqual(caught.exception.code,403)
         finally:http.shutdown();http.server_close()
+
+class ConcurrentReads(unittest.TestCase):
+    def test_reads_observe_complete_revisions(self):
+        server.write_workspace({'campaigns':[],'revision':0})
+        errors=[];finished=threading.Event()
+        def reader():
+            while not finished.is_set():
+                try:
+                    data=server.read_workspace()
+                    if data.get('_recovery') or not isinstance(data.get('revision'),int):errors.append(data)
+                except Exception as e:errors.append(str(e))
+        t=threading.Thread(target=reader);t.start()
+        try:
+            for n in range(1,41):server.write_workspace({'campaigns':[],'revision':n})
+        finally:finished.set();t.join(timeout=5)
+        self.assertEqual(errors,[]);self.assertEqual(server.read_workspace()['revision'],40)
 
 if __name__=='__main__':unittest.main()

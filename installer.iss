@@ -1,5 +1,5 @@
 #define AppName "Ember Table"
-#define AppVersion "0.3.1"
+#define AppVersion "0.7.0"
 [Setup]
 AppId={{E930F682-54A4-4A14-8AA7-4B65FF7AFD17}
 AppName={#AppName}
@@ -8,19 +8,24 @@ DefaultDirName={localappdata}\Programs\EmberTable
 DefaultGroupName={#AppName}
 PrivilegesRequired=lowest
 OutputDir=installer-output
-OutputBaseFilename=EmberTable-Setup-0.3.1
+OutputBaseFilename=EmberTable-Setup-0.7.0
 Compression=lzma2
 SolidCompression=yes
+UsePreviousTasks=no
 WizardStyle=modern
-UninstallDisplayIcon={app}\EmberTable.exe
+SetupIconFile=app\ember-table.ico
+AppPublisher=Ember Table community project
+AppComments=Offline tabletop campaign companion
+UninstallDisplayIcon={app}\ember-table-0.7.0.ico
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
+Name: "desktopicon"; Description: "Create a desktop shortcut"
 [Files]
+Source: "app\ember-table.ico"; DestDir: "{app}"; DestName: "ember-table-0.7.0.ico"; Flags: ignoreversion
 Source: "dist\EmberTable\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\EmberTable.exe"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\EmberTable.exe"; Tasks: desktopicon
+Name: "{group}\{#AppName}"; Filename: "{app}\EmberTable.exe"; WorkingDir: "{app}"; IconFilename: "{app}\ember-table-0.7.0.ico"; IconIndex: 0
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\EmberTable.exe"; WorkingDir: "{app}"; IconFilename: "{app}\ember-table-0.7.0.ico"; IconIndex: 0; Tasks: desktopicon
 [Run]
 Filename: "{app}\EmberTable.exe"; Description: "Open Ember Table"; Flags: nowait postinstall skipifsilent
