@@ -16,13 +16,16 @@ jobs:
           python-version: '3.12'
           architecture: x64
       - name: Install build dependencies
-        run: python -m pip install pyinstaller pywebview pypdf pywinauto
+        run: python -m pip install pyinstaller pywebview pypdf pywinauto reportlab
       - name: Check source syntax
-        run: python -m py_compile desktop.py server.py
+        run: python -m py_compile desktop.py server.py handouts.py
       - name: Test storage and engine
         run: |
           python tests/test_storage.py
+          python tests/test_handouts.py
+          python tests/test_backups.py
           node tests/engine.cjs
+          node tests/table-engine.cjs
       - name: Test desktop interface in Edge
         run: |
           npm install --no-save playwright pdfjs-dist
@@ -46,7 +49,7 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'EmberTableInstalled'
-          $setup = Start-Process 'installer-output\EmberTable-Setup-0.4.0.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
+          $setup = Start-Process 'installer-output\EmberTable-Setup-0.5.0.exe' -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           $exe = Join-Path $target 'EmberTable.exe'
           if (!(Test-Path $exe)) { throw 'Installed executable missing' }
@@ -76,8 +79,8 @@ jobs:
       - name: Verify installer exists
         shell: pwsh
         run: |
-          if (!(Test-Path 'installer-output\EmberTable-Setup-0.4.0.exe')) { throw 'Installer missing' }
-          Get-FileHash 'installer-output\EmberTable-Setup-0.4.0.exe' -Algorithm SHA256 | Format-List | Out-File 'installer-output\SHA256.txt'
+          if (!(Test-Path 'installer-output\EmberTable-Setup-0.5.0.exe')) { throw 'Installer missing' }
+          Get-FileHash 'installer-output\EmberTable-Setup-0.5.0.exe' -Algorithm SHA256 | Format-List | Out-File 'installer-output\SHA256.txt'
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
@@ -92,5 +95,6 @@ jobs:
           path: |
             ui-workspace.png
             ui-map-studio.png
+            ui-map-pro.png
             native-import-qa.png
           if-no-files-found: ignore

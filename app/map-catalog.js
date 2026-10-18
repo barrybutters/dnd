@@ -1,0 +1,62 @@
+/* Original procedural map artwork. Each family changes geometry and details, not only colour. */
+(function(){const A=EmberArt,oldSprite=A.sprite,cache=new Map(),specs=new Map();
+const add=(family,category,names)=>names.split('|').forEach((name,i)=>{const id='pro-'+family+'-'+i;A.catalog.push([id,category,name]);specs.set(id,{family,i,name})});
+add('tree','Trees & plants','Broadleaf oak|Silver birch|Weeping willow|Autumn maple|Cherry blossom|Ancient oak|Dead tree|Snow pine|Tall fir|Palm tree|Cypress|Mangrove|Redwood|Acacia|Orchard tree|Giant mushroom|Toadstool cluster|Fern patch|Reeds|Cactus|Succulent|Water lilies|Brambles|Golden wheat');
+add('roof','Town buildings','Stone cottage|Timber cottage|Thatched hut|Town house|Large inn|Tavern|Blacksmith|Apothecary|Bakery|Merchant house|Stable block|Barn|Granary|Water mill|Chapel|Cathedral|Town hall|Library|Guild hall|Bath house|Market hall|Warehouse|Gatehouse|Wizard observatory');
+add('fort','Fortifications','Round tower|Square tower|Broken tower|Keep courtyard|Fortress gate|Wooden palisade|Stone wall straight|Stone wall corner|Stone wall T junction|Battlements|Watch post|Guard barracks');
+add('dungeon','Dungeon furnishings','Round dining table|Long dining table|Desk with books|Bookshelf|Weapon rack|Armour stand|Anvil|Forge|Cauldron|Alchemy bench|Magic circle|Stone altar|Sarcophagus|Coffin|Iron cage|Prison bars|Floor grate|Pressure plate|Spike trap|Pit trap|Stair up|Stair down|Ladder|Pillar|Broken pillar|Statue|Fountain|Crystal cluster|Mushroom cavern|Rubble pile|Lever|Portcullis');
+add('wild','Wilderness details','Stump|Fallen log|Driftwood|Standing stones|Stone circle|Cairn|Grave marker|Graveyard|Camp bedroll|Adventurer tent|Large pavilion|Supply wagon|Ox cart|Wheel tracks|Picnic fire|Torch|Lantern|Signpost|Road milestone|Wooden dock|Rope bridge|Stone bridge|Waterfall|River rapids');
+add('coast','Coast & travel','Sailing ship|Fishing boat|Longboat|Shipwreck|Lighthouse|Harbour crane|Anchor|Buoy|Fishing net|Coral reef|Seashells|Rocky islet');
+add('land','World features','Jagged peak|Snowy peak|Mountain range|Volcano|Mesa|Desert dune|Rolling hills|Cliff face|Cave mouth|Glacier|Floating island|Crater|Swamp pools|Farmland plots|Vineyard|Town marker|City marker|Village marker|Dungeon entrance|Mine entrance');
+Object.assign(A.textures,{moss:['#526845','#738359','#344e36'],marsh:['#526b57','#788b60','#304e47'],cobblestone:['#8c8b7a','#b0aa95','#5d6660'],flagstone:['#9c9b8a','#c0bba4','#6e776e'],brick:['#986a50','#b58a66','#715141'],tiles:['#8d998c','#c2c7b1','#5f766e'],ploughed:['#6c543e','#957450','#443b2e'],autumn:['#aa8650','#c8a35e','#7a653f'],ice:['#a5c9d0','#dbebdf','#789fae'],ash:['#595b58','#8b8980','#3b4243'],deepwater:['#244b61','#416f82','#152f44'],parchment:['#c9b77f','#e0cc97','#a18e60']});
+const oldPattern=A.pattern;A.pattern=function(name){return oldPattern(name)};
+A.sprite=function(id){if(!specs.has(id))return oldSprite(id);if(cache.has(id))return cache.get(id);const {family,i,name}=specs.get(id),c=document.createElement('canvas');c.width=c.height=192;const g=c.getContext('2d');g.translate(96,96);g.lineWidth=2;g.strokeStyle='#354237';g.lineJoin='round';g.lineCap='round';let seed=i*113+family.length*71;const r=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);const rect=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h);g.strokeRect(x,y,w,h)},poly=(p,col)=>{g.beginPath();p.forEach(([x,y],j)=>j?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fillStyle=col;g.fill();g.stroke()},oval=(x,y,a,b,col)=>{g.beginPath();g.ellipse(x,y,a,b,0,0,7);g.fillStyle=col;g.fill();g.stroke()},line=(p,col='#635e46',w=3)=>{g.strokeStyle=col;g.lineWidth=w;g.beginPath();p.forEach(([x,y],j)=>j?g.lineTo(x,y):g.moveTo(x,y));g.stroke();g.lineWidth=2;g.strokeStyle='#354237'};g.shadowColor='#11221d66';g.shadowBlur=5;g.shadowOffsetY=5;
+if(family==='tree'){
+ if(i===6){for(let a=0;a<7;a++){const t=a*.9;line([[0,40],[Math.sin(t)*22,-5],[Math.sin(t)*52,-48+r()*35]],'#74664b',5)}}
+ else if([7,8,12].includes(i)){rect(-6,25,12,35,'#766347');for(let j=0;j<5;j++)poly([[-46+j*6,45-j*16],[0,-65-j*2],[46-j*6,45-j*16]],i===7?(j%2?'#b2c6b0':'#527566'):['#2b5041','#3d6650','#527d59'][j%3])}
+ else if(i===9){rect(-5,-5,10,65,'#9a8054');for(let j=0;j<9;j++){g.save();g.rotate(j*7/9);poly([[0,0],[-12,-32],[0,-70],[15,-23]],'#6e9355');g.restore()}}
+ else if([15,16,19,20,21].includes(i)){for(let j=0;j<(i===15?1:5);j++){const x=(r()-.5)*80,y=(r()-.5)*65;if(i===19){rect(x-6,y-40,12,70,'#6e8b56');line([[x,y],[x-20,y-10],[x-20,y-27]],'#617c4d',8)}else if(i===21)oval(x,y,19,9,'#7c9f6c');else{rect(x-5,y-5,10,35,'#d6cba7');oval(x,y-7,i===15?48:18,i===15?30:12,i===15?'#b38860':'#bd7855');for(let k=0;k<6;k++)oval(x+(r()-.5)*50,y-13+r()*12,2,2,'#e2d4a0')}}}
+ else if(i>=17){for(let j=0;j<28;j++){const x=r()*100-50,y=r()*75-30;line([[x,y+20],[x+(r()-.5)*16,y-20]],i===23?'#b9a56a':'#597a46',2);if(i===23)oval(x,y-22,3,9,'#d1bc77')}}
+ else{const cols=i===3?['#b78c43','#c6a05d','#9b623a']:i===4?['#bb929e','#d1acb0','#977e8b']:['#66884c','#7b9857','#456c43'];if(i===2)for(let j=0;j<12;j++)line([[r()*60-30,-10],[r()*100-50,60]],'#5d7c4a',3);for(let j=0;j<26;j++){const a=r()*7,d=r()*45;oval(Math.cos(a)*d,Math.sin(a)*d,12+r()*18,12+r()*15,cols[j%3])}}
+}else if(family==='roof'){
+ const w=32+(i%4)*9,h=30+(i%3)*13;rect(-w,-h,w*2,h*2,'#b8aa86');const roofs=['#9b694d','#927653','#768676','#a9814f','#746d72'];const col=roofs[i%5];poly([[-w-5,-h-5],[0,-h-18],[w+5,-h-5],[w+5,h+3],[0,h-10],[-w-5,h+3]],col);poly([[0,-h-18],[w+5,-h-5],[w+5,h+3],[0,h-10]],['#704c3f','#6d6047','#566d60','#8b643e','#555361'][i%5]);for(let y=-h;y<h;y+=8){line([[-w,y],[0,y-13]],'#c29c72',1);line([[0,y-13],[w,y]],'#b38e66',1)}if(i%2)rect(w-10,-h-13,10,15,'#9b9d89');if(i>=14){rect(-w-20,-15,35,35,'#b6b397');poly([[-w-26,-18],[-w,-34],[-w+20,-18],[-w+20,22],[-w-26,22]],col)}if([6,13,17,23].includes(i)){oval(w+2,h-10,19,19,'#929d90');if(i===23)oval(w+2,h-10,12,12,'#6f9fa6');if(i===13){line([[w+2,-30],[w+2,50]],'#69553e',8);for(let y=-28;y<50;y+=10)rect(w-10,y,24,5,'#c0a376')}}if([4,5,10,16].includes(i))for(let x=-w;x<w;x+=18)rect(x,h+8,12,15,'#b8a67a');
+}else if(family==='fort'){
+ const col='#9caa96';if(i<3){if(i===1)rect(-42,-42,84,84,col);else oval(0,0,48,48,col);oval(0,0,30,30,'#4b6156');for(let a=0;a<8;a++){let t=a*Math.PI/4;rect(Math.cos(t)*43-7,Math.sin(t)*43-7,14,14,'#b4bca6')}}else if(i===3){rect(-55,-50,110,100,col);rect(-34,-29,68,58,'#7d8f70');for(const x of [-52,52])for(const y of [-45,45])oval(x,y,20,20,'#b0bba4')}else{const wood=i===5;const paint=wood?'#9f8557':col;rect(-65,-13,130,26,paint);if(i===7||i===8)rect(-13,-64,26,80,paint);if(i===4||i===11){rect(-45,-43,90,86,paint);rect(-25,-36,50,72,'#465b4a')}for(let x=-62;x<65;x+=15)rect(x,-18,9,15,wood?'#b8a071':'#bcc4af')}
+}else if(family==='dungeon'){
+ if(i<6){if(i===0){oval(0,0,48,38,'#ad8b59');for(let a=0;a<6;a++){const t=a*Math.PI/3;rect(Math.cos(t)*62-9,Math.sin(t)*49-9,18,18,'#7c6c48')}}else if(i===1){rect(-65,-24,130,48,'#ad8b59');for(let x=-48;x<60;x+=30){rect(x,-43,17,14,'#8b754e');rect(x,30,17,14,'#8b754e')}}else{rect(-55,-30,110,60,i===3?'#705d45':'#a4875e');for(let j=0;j<9;j++)rect(-46+j*10,-21,7,40,['#89755d','#7b8e7b','#ab9670'][j%3]);if(i===4)for(let j=0;j<5;j++)line([[-40+j*20,-40],[-40+j*20,45]],'#b7bca6',4)}}
+ else if(i===8){oval(0,0,45,45,'#545d53');oval(0,-5,34,32,'#7c965c');line([[-45,0],[45,0]],'#697064',5)}
+ else if(i===10){for(const radius of [56,42,28]){g.strokeStyle='#739d9c';g.beginPath();g.arc(0,0,radius,0,7);g.stroke()}for(let a=0;a<6;a++){const t=a*Math.PI/3;line([[Math.cos(t)*48,Math.sin(t)*48],[Math.cos(t+2.5)*48,Math.sin(t+2.5)*48]],'#89aeb2',2)}}
+ else if([12,13].includes(i)){poly([[-24,-60],[24,-60],[38,-34],[31,59],[-31,59],[-38,-34]],i===12?'#a0aa99':'#8b674a');line([[0,-40],[0,35]],'#c5c5aa',5);line([[-15,-12],[15,-12]],'#c5c5aa',5)}
+ else if([14,15,16,17,18,19,31].includes(i)){rect(-52,-48,104,96,'#69766b');rect(-43,-39,86,78,i===19?'#1e3028':'#879586');for(let x=-38;x<48;x+=15)line([[x,-40],[x,40]],'#bbc1ac',i===17?1:4);if(i===18)for(let x=-32;x<40;x+=20)for(let y=-30;y<40;y+=20)poly([[x-4,y+7],[x,y-9],[x+4,y+7]],'#c5c8b0')}
+ else if([20,21,22].includes(i)){for(let y=-51;y<55;y+=12)rect(-34,y,68,8,i===22?'#a58c62':'#9da996');if(i===22){rect(-40,-62,8,130,'#6c6045');rect(32,-62,8,130,'#6c6045')}}
+ else if([23,24,25,26].includes(i)){oval(0,0,47,47,'#96a38d');oval(0,0,32,32,i===26?'#629a9f':'#b5bda6');if(i===25){oval(0,-16,12,15,'#d1ceb1');poly([[-13,-1],[13,-1],[28,37],[-28,37]],'#b8bea5')}}
+ else if(i===27){for(let j=0;j<7;j++){const x=r()*70-35,y=r()*60-20;poly([[x-10,y+24],[x-7,y-20],[x+4,y-35],[x+13,y+12]],['#82aaa3','#a6b6ba','#6e938e'][j%3])}}
+ else if(i===28){for(let j=0;j<8;j++){const x=r()*90-45,y=r()*80-35;rect(x-3,y,6,25,'#d8c8a3');oval(x,y,15,10,'#8a8273')}}
+ else if(i===29){for(let j=0;j<18;j++)poly([[r()*90-45,r()*80-40],[r()*90-45,r()*80-40],[r()*90-45,r()*80-40]],'#8b9588')}
+ else if(i===30){oval(0,15,28,19,'#959a86');line([[0,10],[20,-40]],'#b6b9a1',8);oval(20,-40,9,9,'#875d48')}
+ else{rect(-40,-30,80,60,i===7?'#7a6e58':'#a7ad99');oval(0,0,25,20,i===7?'#d5994e':'#7b8882')}
+}else if(family==='wild'){
+ if(i<3){g.save();g.rotate(.4);rect(-63,-15,126,30,'#8e7752');for(const x of [-61,61])oval(x,0,10,15,'#b7a071');for(let x=-50;x<55;x+=14)line([[x,-11],[x+10,10]],'#6e6547',2);g.restore();if(i===0)oval(0,0,30,30,'#a68e61')}
+ else if(i<8){for(let j=0;j<(i===4?8:i===7?9:4);j++){const t=j*7/8,x=i===4?Math.cos(t)*49:r()*80-40,y=i===4?Math.sin(t)*49:r()*80-40;rect(x-8,y-15,16,30,'#a5ad98')}}
+ else if(i<11){rect(-34,-48,68,96,'#b9ac82');if(i===8)rect(-30,-42,60,23,'#e0cf9f');else poly([[-55,42],[0,-60],[55,42]],i===10?'#b2ad8c':'#a99a71')}
+ else if(i===11||i===12){rect(-42,-32,84,64,'#9e8056');for(const x of [-48,48])for(const y of [-28,28])oval(x,y,9,18,'#5e6251');line([[40,0],[75,0]],'#8d7752',5)}
+ else if(i===14){oval(0,0,35,28,'#77795b');poly([[-17,16],[-10,-21],[0,-7],[12,-37],[22,16]],'#d49548')}
+ else if(i===15||i===16){rect(-6,-28,12,68,'#8b7752');oval(0,-29,17,20,i===15?'#d7a052':'#ccc182')}
+ else if(i===17||i===18){rect(-5,-25,10,88,'#9f8f6b');rect(-48,-30,96,24,'#b6a178');if(i===17)poly([[48,-30],[65,-18],[48,-6]],'#b6a178')}
+ else if(i>=19&&i<=21){for(let y=-58;y<60;y+=13)rect(-35,y,70,10,i===21?'#9aab9b':'#a18c60');rect(-43,-65,8,130,'#736b50');rect(35,-65,8,130,'#736b50')}
+ else if(i>=22){rect(-42,-60,84,120,'#608d9a');for(let j=0;j<14;j++)line([[-35+r()*70,-50+r()*100],[-30+r()*70,-44+r()*100]],'#c1d7cf',2)}else for(let j=0;j<3;j++)line([[-60,-20+j*20],[60,-20+j*20]],'#84785b',3);
+}else if(family==='coast'){
+ if(i<4){poly([[0,-70],[29,-44],[35,38],[0,69],[-35,38],[-29,-44]],'#987a51');for(let y=-45;y<50;y+=14)rect(-24,y,48,5,'#c5aa75');if(i===0){line([[0,-47],[0,53]],'#584e3c',6);poly([[2,-41],[55,25],[2,20]],'#d7d1b1')}if(i===3)line([[-55,40],[45,-44]],'#52685c',14)}
+ else if(i===4){oval(0,0,35,42,'#a9b6a5');oval(0,-8,24,26,'#dad9bb');oval(0,-12,15,16,'#cdbb78')}
+ else if(i===6){oval(0,-42,9,9,'#a8b5a6');line([[0,-33],[0,37],[-39,12],[0,49],[39,12]],'#839b94',7)}
+ else if(i>=9){for(let j=0;j<18;j++)oval(r()*100-50,r()*100-50,5+r()*15,4+r()*10,i===9?'#b59483':i===11?'#899b87':'#d5c3a0')}
+ else{rect(-38,-35,76,70,'#8e9f88');for(let j=-30;j<38;j+=12){line([[j,-35],[j,35]],'#bdc4a6',1);line([[-38,j],[38,j]],'#bdc4a6',1)}}
+}else if(family==='land'){
+ if(i<5||i===7){const count=i===2?4:1;for(let j=0;j<count;j++){const x=(j-(count-1)/2)*29;poly([[x-43,45],[x+3,-62],[x+45,45]],i===3?'#7a6c5a':'#8b9a88');poly([[x+3,-62],[x+45,45],[x+9,24]],'#5b756b');if(i===1||i===2)poly([[x-11,-30],[x+3,-62],[x+20,-25],[x+4,-32]],'#e0e3cb');if(i===3)oval(x+3,-36,15,6,'#d18a4c')}}
+ else if([5,6,9,10,11,12].includes(i)){for(let j=0;j<6;j++)oval(r()*70-35,r()*50-20,25+r()*18,12+r()*12,i===5?'#ccb27d':i===9?'#b3d4d2':i===12?'#607f64':'#7f9870');if(i===10)poly([[-45,10],[45,10],[0,65]],'#7e8e7c')}
+ else if(i===13||i===14){for(let x=-55;x<60;x+=22){rect(x,-45,17,90,i===14?'#70894e':'#a1a36a');for(let y=-40;y<45;y+=12)line([[x+2,y],[x+15,y]],'#b9b57b',2)}}
+ else if(i>=15&&i<=17){const n=i===16?8:i===15?5:3;for(let j=0;j<n;j++){const x=r()*80-40,y=r()*60-30;rect(x,y,18,21,'#b4a17b');poly([[x-3,y],[x+9,y-14],[x+21,y]],'#8e6b50')}}
+ else{oval(0,5,52,38,'#849580');oval(0,13,31,25,'#293e32');if(i===19){line([[-35,40],[-25,-20],[25,-20],[35,40]],'#a8956e',7);line([[-25,-20],[-25,45],[25,45],[25,-20]],'#aa9874',3)}}
+}
+g.setTransform(1,0,0,1,0,0);cache.set(id,c);return c};
+})();

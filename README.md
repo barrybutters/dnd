@@ -1,4 +1,4 @@
-# Ember Table 0.4.0
+# Ember Table 0.5.0
 
 An offline Windows campaign companion for dungeon masters and players.
 
@@ -36,11 +36,11 @@ Private book packs may be imported from either rules shelf using Import book pac
 ## Deleting records
 Campaign settings on Overview and Campaign include Delete campaign, with an exact-name confirmation. Deleting the last campaign leaves a genuinely empty workspace. Shared rulebooks stay available. Undo works during the current session, and automatic disk backups can restore older workspace revisions. Record delete buttons cover characters, journal entries, quests, sessions, NPCs, items, encounter plans/combatants, maps/tokens, wiki pages/attachments, spells/actions/resources, audio, reference entries and rolls. Deleting a character removes linked combatants and moves its items to party inventory. Removing a container leaves its contents in inventory. Attachment removal unlinks a file; its copied asset may remain on disk. Rulebook removal is separate from campaign undo.
 
-## Book import fix in 0.4.0
+## Book import fix in 0.5.0
 The desktop book-pack button now uses the native Windows file chooser through the pywebview bridge. ZIP contents are streamed into a staging folder, checked, and installed without buffering the full pack. A persistent progress dialog shows completion or specific errors. Closing the app waits for an active import. Browser fallback uses an attached file input. Regression coverage includes the packaged EXE's actual Windows file dialog and a generated 390 MiB five-book fixture; no supplied books enter the public build runner.
 
 
-## Version 0.4.0 — offline studio and campaign preparation
+## Version 0.5.0 — offline studio and campaign preparation
 
 - Map studio: ten deterministic terrain textures, soft round brushes, size/opacity controls, thirty original canvas stamps across six categories, image stamp import, scatter, mirror, rotation, freehand paths/walls/filled shapes, labels, selection/movement and editable size/rotation/opacity. Visible layers have independent opacity, ordering and locks. Add custom layers, duplicate maps/templates, or try the starter landscape. Delete removes an entire artwork object/stroke. Maximum 5,000 artwork objects per map; battle maps remain 8–60 squares per side.
 - Map PNG export at 1×/2×/4× pixel dimensions with player fog or artwork-only options. Transparent image stamps are supported. Artwork is original procedural illustration, not Inkarnate's proprietary art collection. This is a local editor, not an Inkarnate-compatible file importer.
@@ -54,3 +54,24 @@ The desktop book-pack button now uses the native Windows file chooser through th
 - Diagnostics: installed version, save/import flags, disk write check, free space, backup/book counts and recent UI errors. Review/copy/export the report. Reports exclude campaign content; technical errors can still merit review before sharing.
 
 Existing workspace and book-pack imports, native chooser regression, backups and delete controls remain covered by checks. Data format additions are backward compatible with 0.3.3 workspaces. Upgrading keeps data in the same local folder. Do not run two app versions against the same data directory simultaneously.
+
+
+## Version 0.5.0 — expanded map studio and table tools
+
+The map catalogue contains 178 original procedural stamps (including the original 30), grouped into nature, town buildings, fortifications, dungeon furnishings, wilderness, coastal and world-feature categories. There are 22 terrain palettes. Stamp search spans categories; favourites and imported image stamps stay local. This is a growing original catalogue, not Inkarnate's proprietary asset collection or file format.
+
+New map tools include smooth editable roads/rivers, textured rectangles/ellipses/polygons, whole-layer fill, viewport panning, half-square snapping, multiple selection and marquee selection, groups, copy/paste/duplicate, rotation/scaling/mirroring, alignment/distribution, ordering within layers, reusable cross-campaign prefabs and seeded scenery generation. Generated scenes scatter editable objects; they do not automatically create a playable dungeon or enforce architectural layouts. Up to 5,000 artwork objects and 500 location pins are supported per map. Pins can link to wiki records, notes, quests, encounters or shops; hidden pins are excluded from the TV response. Shared pins under fog stay visually concealed. Player-role maps are read-only. Selection on rotated stamps uses approximate axis-aligned bounds.
+
+Campaign search covers the active campaign and follows sharing settings. Player Overview/Campaign/Journal/Session pages now use the shared party journal rather than displaying DM quest or session text. Quest sharing stores a separate player-facing description; DM quest notes are not copied automatically. Roles remain a convenience on a shared local PC, not a login/security boundary.
+
+Treasure and shops use whole copper arithmetic, stock limits, currency conversion and inventory transfer. Buying fails without mutation when funds or stock are insufficient. Party currency splitting leaves indivisible copper with the party. Treasure parcels can only be claimed once; Undo can restore a previous state. Wishlists are shared party records.
+
+Downtime tracks table-agreed workdays and costs, charges the selected payer and advances the campaign calendar for each workday. Faction reputation supports private or shared records. These tools do not adjudicate official crafting or downtime rules automatically.
+
+Combat helpers track concentration checks after damage, sustained-effect duration at the creature's next turn, reaction availability and legendary-action counters. Constitution saves use sheet modifiers or an editable NPC bonus; the player/DM resolves the result and other class features manually. Reactions and legendary action counters reset at that creature's turn. Initiative-linked resources, reminders and concentration persist in the workspace.
+
+Local PDF exports create paginated documents/letters or reference-card sheets from reviewed text, using bundled ReportLab and embedded Bitstream Vera fonts. Spell and item cards contain your entered data. They are not a bundled official card collection. Session utilities include a wall-clock session timer, a break reminder while the app is open, checklists, original inspiration prompts and equal-probability custom roll tables.
+
+Folder backups use a native destination-folder chooser, atomic copies and unique filenames, without overwriting earlier backups. The last successful copy is recorded; the app cannot verify whether a chosen folder is a different physical drive. Browser fallback offers a download rather than marking an external copy complete. Workspace ZIP restore supports 600 MB compressed / 1 GB expanded, allowing the existing five-book library to fit within its restore limit. Exporting still requires enough RAM and disk space for the complete local package.
+
+Validation includes the original storage/engine/UI/native-import regressions, pure currency and concentration checks, PDF pagination/embedded-font tests, atomic folder-copy tests, a full Windows UI workflow for the new tools and the packaged application's PDF generator and player display. Physical TV hardware and Windows wireless casting remain user-hardware checks.

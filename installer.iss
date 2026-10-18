@@ -1,5 +1,5 @@
 #define AppName "Ember Table"
-#define AppVersion "0.4.0"
+#define AppVersion "0.5.0"
 [Setup]
 AppId={{E930F682-54A4-4A14-8AA7-4B65FF7AFD17}
 AppName={#AppName}
@@ -8,7 +8,7 @@ DefaultDirName={localappdata}\Programs\EmberTable
 DefaultGroupName={#AppName}
 PrivilegesRequired=lowest
 OutputDir=installer-output
-OutputBaseFilename=EmberTable-Setup-0.4.0
+OutputBaseFilename=EmberTable-Setup-0.5.0
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

@@ -6,6 +6,7 @@ from urllib.parse import urlparse,parse_qs
 BASE=Path(__file__).resolve().parent
 sys.path.insert(0,str(BASE/'vendor'))
 from pypdf import PdfReader
+from handouts import render_handout
 DATA=Path(os.environ.get('EMBER_TABLE_DATA') or (Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'EmberTable'))
 DATA.mkdir(parents=True,exist_ok=True)
 ASSETS=DATA/'assets';ASSETS.mkdir(exist_ok=True)
@@ -94,7 +95,7 @@ def export_package():
 def import_package(raw):
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         infos=z.infolist()
-        if len(infos)>2000 or sum(i.file_size for i in infos)>500*1024*1024:raise ValueError('Package too large (500 MB expanded maximum).')
+        if len(infos)>2000 or sum(i.file_size for i in infos)>1024*1024*1024:raise ValueError('Package too large (1 GB expanded maximum).')
         if 'workspace.json' not in z.namelist():raise ValueError('Missing workspace.json')
         data=validate(json.loads(z.read('workspace.json')))
         assets={};books={}
@@ -187,7 +188,7 @@ class Handler(SimpleHTTPRequestHandler):
                 readable=False
                 try:readable=isinstance(read_workspace(),dict)
                 except ValueError:pass
-                self.reply({'version':'0.4.0','platform':sys.platform,'python':sys.version.split()[0],
+                self.reply({'version':'0.5.0','platform':sys.platform,'python':sys.version.split()[0],
                     'workspaceReadable':readable,'writable':writable,'freeMiB':shutil.disk_usage(DATA).free//(1024*1024),
                     'backups':len(list(BACKUPS.glob('*.json'))),'books':len(list(RULES.glob('*.json')))})
             elif path=='/api/backups':self.reply([{'id':p.name,'time':p.stat().st_mtime} for p in sorted(BACKUPS.glob('*.json'),reverse=True)])
@@ -222,7 +223,7 @@ class Handler(SimpleHTTPRequestHandler):
                 s=read_workspace() or {};c=next((c for c in s.get('campaigns',[]) if c.get('id')==s.get('selected')),{});m=next((m for m in c.get('maps',[]) if m.get('id')==c.get('activeMap')),None)
                 if m:
                     # This display omits DM records and hidden tokens.
-                    m=dict(m);m['tokens']=[t for t in m.get('tokens',[]) if not t.get('hidden')];m.pop('notes',None)
+                    m=dict(m);m['pins']=[p for p in m.get('pins',[]) if not p.get('secret',True)];m['tokens']=[t for t in m.get('tokens',[]) if not t.get('hidden')];m.pop('notes',None)
                 self.reply({'name':c.get('name','Ember Table'),'map':m,'round':c.get('round',1)})
             elif path.startswith('/assets/') and ASSET_RE.fullmatch(path[8:]):
                 p=ASSETS/path[8:]
@@ -236,7 +237,7 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             n=int(self.headers.get('Content-Length','0'))
             route=urlparse(self.path).path
-            limit=600 if route=='/api/rules/pack' else 250 if route in ['/api/import','/api/rules'] else 100
+            limit=600 if route=='/api/rules/pack' else 600 if route=='/api/import' else 250 if route=='/api/rules' else 100
             if n<1 or n>limit*1024*1024:raise ValueError('Request exceeds the size limit.')
             path=urlparse(self.path).path
             if path=='/api/rules/pack':
@@ -263,6 +264,8 @@ class Handler(SimpleHTTPRequestHandler):
                 bid=json.loads(raw).get('id','')
                 if not re.fullmatch(r'[a-f0-9]{32}',bid):raise ValueError('Invalid book')
                 (RULES/(bid+'.json')).unlink(missing_ok=True);self.reply({'removed':True})
+            elif path=='/api/handout':
+                spec=json.loads(raw);self.send_bytes(render_handout(spec.get('title',''),spec.get('text',''),spec.get('layout','document')),'application/pdf','Ember-Handout.pdf')
             elif path=='/api/pdf':self.reply(parse_pdf(raw))
             elif path=='/api/workspace':write_workspace(json.loads(raw));self.reply({'saved':True})
             elif path=='/api/import':self.reply(import_package(raw))

@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 py -3 -m venv .build-env
 if errorlevel 1 goto fail
-.build-env\Scripts\python.exe -m pip install pyinstaller pywebview pypdf
+.build-env\Scripts\python.exe -m pip install pyinstaller pywebview pypdf reportlab
 if errorlevel 1 goto fail
 call npm install --no-save pdfjs-dist
 if errorlevel 1 goto fail

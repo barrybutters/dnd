@@ -17,6 +17,13 @@ def main():
         if qa_port:
             with (server.DATA/'display-test-log.txt').open('a',encoding='utf-8') as log:log.write(message+'\n')
     class DesktopAPI:
+        def backup_to_folder(self):
+            from backups import write_folder_backup
+            try:
+                selected=main_window.create_file_dialog(webview.FileDialog.FOLDER)
+                if not selected:return {'cancelled':True}
+                return write_folder_backup(selected[0],server.export_package())
+            except Exception as e:return {'error':str(e)}
         def choose_rulepack(self):
             def trace(message):
                 with (server.DATA/'book-import-log.txt').open('a',encoding='utf-8') as log:log.write(message+'\n')
@@ -48,10 +55,10 @@ def main():
             display_trace('open display returned')
             return True
     try:
-        main_window=webview.create_window('Ember Table 0.4.0',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
+        main_window=webview.create_window('Ember Table 0.5.0',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
         def before_close():
             try:
-                pending=main_window.evaluate_js("Boolean(window.__saving || window.__scratchPending || window.__bookImporting)")
+                pending=main_window.evaluate_js("Boolean(window.__saving || window.__scratchPending || window.__bookImporting || window.__externalBackup)")
                 if pending:
                     main_window.evaluate_js("if(typeof save==='function') save(); if(typeof toast==='function') toast('Saving or importing. Please wait until it finishes before closing.');")
                     return False
