@@ -22,17 +22,24 @@ def validate(data):
     return data
 
 def read_workspace():
-    path=DATA/'workspace.json'
-    if not path.exists():return None
-    try:return validate(json.loads(path.read_text(encoding='utf-8')))
-    except (ValueError,OSError):
-        for p in sorted(BACKUPS.glob('*.json'),reverse=True):
-            try:
-                data=validate(json.loads(p.read_text(encoding='utf-8')))
-                data['_recovery']='Recovered from automatic backup '+p.name
-                return data
-            except (ValueError,OSError):continue
-        raise ValueError('The saved workspace is damaged. Restore an exported backup. The damaged file has been preserved.')
+    with LOCK:
+        path=DATA/'workspace.json'
+        if not path.exists():return None
+        try:
+            for attempt in range(5):
+                try:raw=path.read_text(encoding='utf-8');break
+                except PermissionError:
+                    if attempt==4:raise
+                    time.sleep(.05*(attempt+1))
+            return validate(json.loads(raw))
+        except ValueError:
+            for p in sorted(BACKUPS.glob('*.json'),reverse=True):
+                try:
+                    data=validate(json.loads(p.read_text(encoding='utf-8')))
+                    data['_recovery']='Recovered from automatic backup '+p.name
+                    return data
+                except (ValueError,OSError):continue
+            raise ValueError('The saved workspace is damaged. Restore an exported backup. The damaged file has been preserved.')
 
 def write_workspace(data):
     validate(data)
@@ -46,7 +53,11 @@ def write_workspace(data):
         raw=json.dumps(data,ensure_ascii=False).encode('utf-8')
         tmp=DATA/'workspace.tmp'
         with tmp.open('wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
-        os.replace(tmp,current)
+        for attempt in range(5):
+            try:os.replace(tmp,current);break
+            except PermissionError:
+                if attempt==4:raise
+                time.sleep(.05*(attempt+1))
         for p in sorted(BACKUPS.glob('*.json'),reverse=True)[30:]:p.unlink()
 
 def parse_pdf(raw):

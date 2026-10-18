@@ -84,4 +84,20 @@ class Storage(unittest.TestCase):
             self.assertEqual(caught.exception.code,403)
         finally:http.shutdown();http.server_close()
 
+class ConcurrentReads(unittest.TestCase):
+    def test_reads_observe_complete_revisions(self):
+        server.write_workspace({'campaigns':[],'revision':0})
+        errors=[];finished=threading.Event()
+        def reader():
+            while not finished.is_set():
+                try:
+                    data=server.read_workspace()
+                    if data.get('_recovery') or not isinstance(data.get('revision'),int):errors.append(data)
+                except Exception as e:errors.append(str(e))
+        t=threading.Thread(target=reader);t.start()
+        try:
+            for n in range(1,41):server.write_workspace({'campaigns':[],'revision':n})
+        finally:finished.set();t.join(timeout=5)
+        self.assertEqual(errors,[]);self.assertEqual(server.read_workspace()['revision'],40)
+
 if __name__=='__main__':unittest.main()

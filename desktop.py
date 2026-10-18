@@ -58,7 +58,7 @@ def main():
         main_window=webview.create_window('Ember Table 0.5.0',http.app_origin,width=1440,height=960,min_size=(900,650),js_api=DesktopAPI())
         def before_close():
             try:
-                pending=main_window.evaluate_js("Boolean(window.__saving || window.__scratchPending || window.__bookImporting || window.__externalBackup)")
+                pending=main_window.evaluate_js("Boolean(window.__saving || window.__saveError || window.__scratchPending || window.__bookImporting || window.__externalBackup)")
                 if pending:
                     main_window.evaluate_js("if(typeof save==='function') save(); if(typeof toast==='function') toast('Saving or importing. Please wait until it finishes before closing.');")
                     return False
