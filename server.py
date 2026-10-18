@@ -230,6 +230,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if not p.exists():self.reply({'error':'Asset missing'},404)
                 else:self.send_bytes(p.read_bytes(),mimetypes.guess_type(p.name)[0] or 'application/octet-stream')
             else:super().do_GET()
+        except (BrokenPipeError,ConnectionAbortedError,ConnectionResetError):pass
         except Exception as e:self.reply({'error':str(e)},500)
     def do_POST(self):
         if self.headers.get('Origin')!=self.server.app_origin or self.headers.get('Host')!=self.server.app_origin.removeprefix('http://'):
