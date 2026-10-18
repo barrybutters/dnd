@@ -47,6 +47,19 @@ jobs:
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Scan build with Microsoft Defender when available
+        shell: pwsh
+        run: |
+          $status = Get-MpComputerStatus -ErrorAction SilentlyContinue
+          if ($status -and $status.AntivirusEnabled -and $status.AMServiceEnabled) {
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path 'dist/EmberTable')
+            Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path 'installer-output')
+            $hits = Get-MpThreatDetection | Where-Object { ($_.Resources -join ' ') -match 'EmberTable' }
+            if ($hits) { $hits | Format-List; throw 'Defender reported a build detection' }
+            Write-Output 'Defender custom scan completed without a reported EmberTable detection'
+          } else {
+            Write-Output 'Defender unavailable on this hosted runner; antivirus acceptance remains unverified'
+          }
       - name: Test install and desktop startup
         shell: pwsh
         run: |
@@ -60,9 +73,15 @@ jobs:
           Start-Sleep -Seconds 15
           if ($app.HasExited) { throw "Desktop app exited unexpectedly: $($app.ExitCode)" }
           $connections = Get-NetTCPConnection -OwningProcess $app.Id -State Listen -ErrorAction SilentlyContinue
-          $local = $connections | Where-Object LocalAddress -eq '127.0.0.1' | Select-Object -First 1
-          if (!$local) { Stop-Process -Id $app.Id -Force; throw 'Desktop local server did not start' }
-          $origin = "http://127.0.0.1:$($local.LocalPort)"
+          $origin = $null
+          foreach ($local in ($connections | Where-Object LocalAddress -eq '127.0.0.1')) {
+            $candidate = "http://127.0.0.1:$($local.LocalPort)"
+            try {
+              $health = Invoke-RestMethod "$candidate/api/diagnostics" -TimeoutSec 3
+              if ($health.version -eq '0.6.0') { $origin = $candidate; break }
+            } catch { }
+          }
+          if (!$origin) { Stop-Process -Id $app.Id -Force; throw 'Desktop local server did not start' }
           $page = Invoke-WebRequest $origin -UseBasicParsing
           if ($page.Content -notmatch 'Ember Table') { throw 'App page missing' }
           $data = @{ campaigns = @(@{ name = 'Installer smoke test' }) } | ConvertTo-Json -Depth 5
